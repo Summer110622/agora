@@ -1,0 +1,216 @@
+import threading
+
+from collections.abc import Sequence
+from functools import partial
+from typing import NamedTuple
+
+from agora_server.types import GhostPhase
+
+from hivemind.dht import DHT, DHTNode, DHTValue
+from hivemind.moe.client.expert import RemoteExpert, create_remote_experts
+from hivemind.moe.expert_uid import (
+    FLAT_EXPERT,
+    UID_DELIMITER,
+    UID_PATTERN,
+    Coordinate,
+    ExpertPrefix,
+    ExpertUID,
+    is_valid_uid,
+    split_uid,
+)
+from hivemind.p2p import PeerID
+from hivemind.utils import MAX_DHT_TIME_DISCREPANCY_SECONDS, DHTExpiration, MPFuture, get_dht_time, get_logger
+
+
+logger = get_logger(__name__)
+
+
+class ExpertInfo(NamedTuple):
+    """
+    Information about a single expert in the DHT: its uid, the peer that hosts it, and its ghost phase.
+    Phase 1 ghost experts are not sent any batches from trainers, but receive AR updates.
+    Phase 2 ghost experts receive batches (for optimizer warm-up) but don't contribute to AR.
+    ghost_phase_start_epoch is the epoch at which the current ghost phase began (None when ghost_phase is OFF).
+    """
+
+    uid: ExpertUID
+    peer_id: PeerID
+    ghost_phase: GhostPhase = GhostPhase.OFF
+    ghost_phase_start_epoch: int | None = None
+
+
+class DHTHandlerThread(threading.Thread):
+    def __init__(
+        self,
+        module_backends,
+        dht: DHT,
+        update_period: float = 30,
+        expiration: float | None = None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        if expiration is None:
+            expiration = max(2 * update_period, MAX_DHT_TIME_DISCREPANCY_SECONDS)
+        self.module_backends = module_backends
+        self.dht = dht
+        self.update_period = update_period
+        self.expiration = expiration
+        self.stop = threading.Event()
+
+    def run(self) -> None:
+        declare_experts(
+            self.dht,
+            self.module_backends.keys(),
+            expiration_time=get_dht_time() + self.expiration,
+            ghost_phases=[backend.optimizer.ghost_phase for backend in self.module_backends.values()],
+            ghost_phase_start_epochs=[
+                backend.optimizer.ghost_phase_start_epoch for backend in self.module_backends.values()
+            ],
+        )
+        while not self.stop.wait(self.update_period):
+            declare_experts(
+                self.dht,
+                self.module_backends.keys(),
+                expiration_time=get_dht_time() + self.expiration,
+                ghost_phases=[backend.optimizer.ghost_phase for backend in self.module_backends.values()],
+                ghost_phase_start_epochs=[
+                    backend.optimizer.ghost_phase_start_epoch for backend in self.module_backends.values()
+                ],
+            )
+
+
+def declare_experts(
+    dht: DHT,
+    uids: Sequence[ExpertUID],
+    expiration_time: DHTExpiration,
+    ghost_phases: Sequence[GhostPhase] | None = None,
+    ghost_phase_start_epochs: Sequence[int | None] | None = None,
+    wait: bool = True,
+) -> dict[ExpertUID, bool] | MPFuture[dict[ExpertUID, bool]]:
+    """Make experts visible to all DHT peers; update timestamps if declared previously.
+
+    Args:
+        uids (Sequence[ExpertUID]): A list of expert ids to update.
+        expiration_time (DHTExpiration): Experts will be visible for this many seconds.
+        ghost_phases (Sequence[GhostPhase]|None, optional): If specified, must be of the same length as uids. Indicates ghost phase for each expert. Defaults to None (OFF for all).
+        ghost_phase_start_epochs (Sequence[int|None]|None, optional): If specified, must be of the same length as uids. Indicates the epoch at which each expert's current ghost phase began. Required (and used) only when the corresponding ghost_phase is not OFF. Defaults to None.
+        wait (bool, optional): If True, awaits for declaration to finish, otherwise runs in background. Defaults to True.
+    Returns:
+        dict[ExpertUID, bool] | MPFuture[dict[ExpertUID, bool]]: If wait, returns store status for every key (True = store succeeded, False = store rejected).
+    """
+    assert not isinstance(uids, str), "Please send a list / tuple of expert uids."
+    if not isinstance(uids, list):
+        uids = list(uids)
+    for uid in uids:
+        assert is_valid_uid(uid), f"{uid} is not a valid expert uid. All uids must follow {UID_PATTERN.pattern}"
+    if ghost_phases is not None:
+        assert len(ghost_phases) == len(uids), "If ghost_phases is specified, it must be of the same length as uids."
+    else:
+        ghost_phases = [GhostPhase.OFF] * len(uids)
+    if ghost_phase_start_epochs is not None:
+        assert len(ghost_phase_start_epochs) == len(uids), (
+            "If ghost_phase_start_epochs is specified, it must be of the same length as uids."
+        )
+    else:
+        ghost_phase_start_epochs = [None] * len(uids)
+    return dht.run_coroutine(
+        partial(
+            _declare_experts,
+            uids=uids,
+            expiration_time=expiration_time,
+            ghost_phases=ghost_phases,
+            ghost_phase_start_epochs=ghost_phase_start_epochs,
+        ),
+        return_future=not wait,
+    )
+
+
+async def _declare_experts(
+    dht: DHT,
+    node: DHTNode,
+    uids: list[ExpertUID],
+    ghost_phases: list[GhostPhase],
+    ghost_phase_start_epochs: list[int | None],
+    expiration_time: DHTExpiration,
+) -> dict[ExpertUID, bool]:
+    num_workers = len(uids) if dht.num_workers is None else min(len(uids), dht.num_workers)
+    data_to_store: dict[tuple[ExpertPrefix, Coordinate | None], DHTValue] = {}
+
+    for uid, ghost_phase, ghost_phase_start_epoch in zip(uids, ghost_phases, ghost_phase_start_epochs):
+        expert_dht_value = format_expert_dht_value(dht.peer_id, ghost_phase, ghost_phase_start_epoch)
+        data_to_store[uid, None] = expert_dht_value
+        prefix = uid if uid.count(UID_DELIMITER) > 1 else f"{uid}{UID_DELIMITER}{FLAT_EXPERT}"
+        for _ in range(prefix.count(UID_DELIMITER) - 1):
+            prefix, last_coord = split_uid(prefix)
+            data_to_store[prefix, last_coord] = (uid, expert_dht_value)
+
+    keys, maybe_subkeys, values = zip(*((key, subkey, value) for (key, subkey), value in data_to_store.items()))
+    store_ok = await node.store_many(keys, values, expiration_time, subkeys=maybe_subkeys, num_workers=num_workers)
+    return store_ok
+
+
+def get_experts(
+    dht: DHT,
+    uids: list[ExpertUID],
+    expiration_time: DHTExpiration | None = None,
+    return_future: bool = False,
+) -> list[RemoteExpert | None] | MPFuture[list[RemoteExpert | None]]:
+    """Get RemoteExpert instances for experts with given uids from the DHT.
+
+    Args:
+        dht (DHT): DHT instance to use for lookup.
+        uids (list[ExpertUID]): Find experts with these ids from across the DHT.
+        expiration_time (DHTExpiration | None, optional): If specified, return experts that expire no sooner than this (based on get_dht_time). Defaults to None.
+        return_future (bool, optional): If False (default), return when finished. Otherwise return MPFuture and run in background. Defaults to False.
+
+    Returns:
+        list[RemoteExpert|None]|MPFuture[list[RemoteExpert|None]]: a list of [RemoteExpert if found else None].
+    """
+    assert not isinstance(uids, str), "Please send a list / tuple of expert uids."
+    result = dht.run_coroutine(partial(_get_experts, uids=list(uids), expiration_time=expiration_time), return_future)
+    return create_remote_experts(result, dht, return_future)
+
+
+async def _get_experts(
+    dht: DHT,
+    node: DHTNode,
+    uids: list[ExpertUID],
+    expiration_time: DHTExpiration | None,
+) -> list[ExpertInfo | None]:
+    if expiration_time is None:
+        expiration_time = get_dht_time()
+    num_workers = len(uids) if dht.num_workers is None else min(len(uids), dht.num_workers)
+    found: dict[ExpertUID, DHTValue] = await node.get_many(uids, expiration_time, num_workers=num_workers)
+
+    experts: list[ExpertInfo | None] = [None] * len(uids)
+    for i, uid in enumerate(uids):
+        server_peer_id = found[uid]
+        if server_peer_id is not None and isinstance(server_peer_id.value, str):
+            peer_id, ghost_phase, ghost_phase_start_epoch = parse_expert_dht_value(server_peer_id.value)
+            experts[i] = ExpertInfo(uid, peer_id, ghost_phase, ghost_phase_start_epoch)
+    return experts
+
+
+def format_expert_dht_value(
+    peer_id: PeerID,
+    ghost_phase: GhostPhase = GhostPhase.OFF,
+    ghost_phase_start_epoch: int | None = None,
+) -> str:
+    base = peer_id.to_base58()
+    if ghost_phase == GhostPhase.PHASE1:
+        return f"{base}_ghost1_{ghost_phase_start_epoch}"
+    elif ghost_phase == GhostPhase.PHASE2:
+        return f"{base}_ghost2_{ghost_phase_start_epoch}"
+    return base
+
+
+def parse_expert_dht_value(dht_value: str) -> tuple[PeerID, GhostPhase, int | None]:
+    for suffix, phase in (("_ghost1_", GhostPhase.PHASE1), ("_ghost2_", GhostPhase.PHASE2)):
+        idx = dht_value.rfind(suffix)
+        if idx != -1:
+            return (
+                PeerID.from_base58(dht_value[:idx]),
+                phase,
+                int(dht_value[idx + len(suffix) :]),
+            )
+    return PeerID.from_base58(dht_value), GhostPhase.OFF, None

@@ -1,0 +1,9 @@
+{
+    "run_config": "reparam_llama/8B_sparta_async_C.yaml",
+    "auth_server": "https://auth.pluralis.ai",
+    "prom_gateway": "https://metrics.pluralis.ai",
+    "seeds": [
+        "/ip4/3.142.93.219/tcp/29200/p2p/QmbqUu16DaUBVBXTuc8jtuy85yuZTMEYjxdQxxrARs7QN6",
+        "/ip4/18.222.138.86/tcp/29200/p2p/QmYqxM8wQPrXfehw5A9c8eBBuhCjAcJ9DBeQUDu7CHfTvN"
+    ]
+}

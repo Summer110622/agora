@@ -1,0 +1,22 @@
+include:
+  ./default.yaml
+
+# Model
+model_config: 8B_C
+
+# DHT Configuration
+num_handlers: 7
+num_stages: 7
+num_dht: 8
+
+
+# State Averager
+state_avg_config:
+  init_args:
+    clip_grad_norm: 0.3779
+    clip_grad_norm_tail: 0.7558
+    clip_grad_norm_head: 0.3779
+    part_size_bytes: 2097152
+
+# Training
+max_batch_size: {20: 1, 42: 2, 54: 3, 64: 4, 78: 5}
