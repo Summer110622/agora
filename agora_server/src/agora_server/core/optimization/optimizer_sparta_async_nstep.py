@@ -1,4 +1,4 @@
-# Copyright 2025 Pluralis Research
+# Copyright 2026 Pluralis Research
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -109,6 +109,10 @@ class OptimizerAsyncSparta(Optimizer):
                     f"Entering ghost phase 1 at epoch {self.tracker.global_epoch}, state is {gap} epochs stale."
                 )
                 self._enter_ghost_mode()
+                logger.info(
+                    f"Ghost phase 1 will last {self.ghost_phase1_steps} steps, "
+                    f"ending at local epoch {self.ghost_phase_start_epoch + self.ghost_phase1_steps}"
+                )
 
         # catch up if behind
         if self._catchup_epoch():
@@ -133,6 +137,10 @@ class OptimizerAsyncSparta(Optimizer):
                 if self.ghost_phase2_steps > 0:
                     self._transition_to_phase2()
                     logger.info(f"Transitioning to ghost phase 2 at {self.local_epoch} local epoch")
+                    logger.info(
+                        f"Ghost phase 2 will last {self.ghost_phase2_steps} steps, "
+                        f"ending at local epoch {self.ghost_phase_start_epoch + self.ghost_phase2_steps}"
+                    )
                 else:
                     self._exit_ghost_mode()
                     logger.info(f"Exiting ghost mode at {self.local_epoch} local epoch")

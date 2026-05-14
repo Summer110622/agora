@@ -1,6 +1,5 @@
 ---
-icon: gear
-order: 70
+icon: material/cog
 ---
 
 # Advanced
@@ -12,8 +11,8 @@ order: 70
 Run one CLI instance per GPU:
 
 ```bash
-python3 node0_cli.py --gpu_id 0
-python3 node0_cli.py --gpu_id 1
+python3 agora.py --gpu_id 0
+python3 agora.py --gpu_id 1
 ```
 
 Each GPU automatically uses its own port (49200, 49201, ...). Make sure every port is open for inbound TCP.
@@ -48,31 +47,31 @@ The `--log_file` and `--identity_path` defaults are almost always what you want 
 
 ### 1. Install dependencies
 
-**Docker:**
+=== "Docker"
 
-```bash
-docker build . -t pluralis_node0 --label image_version=1
-```
+    ```bash
+    docker build . -t pluralis_agora --label image_version=1
+    ```
 
-**Native (no Docker):**
+=== "Native (no Docker)"
 
-Prerequisites: Python 3.11, `pip >= 25.3`, NVIDIA drivers with CUDA 12.8, conda.
+    Prerequisites: Python 3.11, `pip >= 25.3`, NVIDIA drivers with CUDA 12.8, conda.
 
-```bash
-# Create and activate a Python 3.11 environment
-conda create -y -n node0 python=3.11
-conda activate node0
+    ```bash
+    # Create and activate a Python 3.11 environment
+    conda create -y -n agora python=3.11
+    conda activate agora
 
-# Upgrade pip
-pip install --upgrade "pip>=25.3"
+    # Upgrade pip
+    pip install --upgrade "pip>=25.3"
 
-# Install PyTorch with CUDA 12.8 support
-pip install torch==2.7.0 --index-url https://download.pytorch.org/whl/cu128
+    # Install PyTorch with CUDA 12.8 support
+    pip install torch==2.7.0 --index-url https://download.pytorch.org/whl/cu128
 
-# Install the two required packages from source
-pip install --build-constraint constraints.txt -e ./node0_server
-pip install --build-constraint constraints.txt -e ./node0
-```
+    # Install the two required packages from source
+    pip install --build-constraint constraints.txt -e ./agora_server
+    pip install --build-constraint constraints.txt -e ./agora
+    ```
 
 ### 2. Read runtime parameters
 
@@ -102,43 +101,43 @@ PUBLIC_IP=$(curl -s https://api.ipify.org)
 
 Default port convention: `49200 + gpu_id`. Each GPU needs its own port.
 
-**Native:**
+=== "Native"
 
-```bash
-CUDA_VISIBLE_DEVICES=<gpu_id> python3.11 node0/src/node0/run_server.py \
-  --gpu_id <gpu_id> \
-  --config "$RUN_CONFIG" \
-  --token <hf_token> \
-  --auth_server "$AUTH_SERVER" \
-  --prom_gateway "$PROM_GATEWAY" \
-  --host_maddrs /ip4/0.0.0.0/tcp/<port> \
-  --announce_maddrs /ip4/$PUBLIC_IP/tcp/<port> \
-  --initial_peers $SEEDS \
-  --email <email> \
-  --log_file logs/server_gpu<gpu_id>.log \
-  --identity_path private_gpu<gpu_id>.key
-```
+    ```bash
+    CUDA_VISIBLE_DEVICES=<gpu_id> python3.11 agora/src/agora/run_server.py \
+      --gpu_id <gpu_id> \
+      --config "$RUN_CONFIG" \
+      --token <hf_token> \
+      --auth_server "$AUTH_SERVER" \
+      --prom_gateway "$PROM_GATEWAY" \
+      --host_maddrs /ip4/0.0.0.0/tcp/<port> \
+      --announce_maddrs /ip4/$PUBLIC_IP/tcp/<port> \
+      --initial_peers $SEEDS \
+      --email <email> \
+      --log_file logs/server_gpu<gpu_id>.log \
+      --identity_path private_gpu<gpu_id>.key
+    ```
 
-**Docker:**
+=== "Docker"
 
-```bash
-docker run -d --name node0_gpu<gpu_id> --ipc=host --network=host \
-  --gpus device=<gpu_id> \
-  -v $(pwd):/home -w /home \
-  pluralis_node0 \
-  bash -c "CUDA_VISIBLE_DEVICES=0 python3.11 node0/src/node0/run_server.py \
-    --gpu_id <gpu_id> \
-    --config $RUN_CONFIG \
-    --token <hf_token> \
-    --auth_server $AUTH_SERVER \
-    --prom_gateway $PROM_GATEWAY \
-    --host_maddrs /ip4/0.0.0.0/tcp/<port> \
-    --announce_maddrs /ip4/$PUBLIC_IP/tcp/<port> \
-    --initial_peers $SEEDS \
-    --email <email> \
-    --log_file logs/server_gpu<gpu_id>.log \
-    --identity_path private_gpu<gpu_id>.key"
-```
+    ```bash
+    docker run -d --name agora_gpu<gpu_id> --ipc=host --network=host \
+      --gpus device=<gpu_id> \
+      -v $(pwd):/home -w /home \
+      pluralis_agora \
+      bash -c "CUDA_VISIBLE_DEVICES=0 python3.11 agora/src/agora/run_server.py \
+        --gpu_id <gpu_id> \
+        --config $RUN_CONFIG \
+        --token <hf_token> \
+        --auth_server $AUTH_SERVER \
+        --prom_gateway $PROM_GATEWAY \
+        --host_maddrs /ip4/0.0.0.0/tcp/<port> \
+        --announce_maddrs /ip4/$PUBLIC_IP/tcp/<port> \
+        --initial_peers $SEEDS \
+        --email <email> \
+        --log_file logs/server_gpu<gpu_id>.log \
+        --identity_path private_gpu<gpu_id>.key"
+    ```
 
 ---
 
@@ -146,7 +145,7 @@ docker run -d --name node0_gpu<gpu_id> --ipc=host --network=host \
 
 ### private.key
 
-On first run, Node0 generates a `private.key` file (or `private_gpu<ID>.key` for multi-GPU setups). This is your node's cryptographic identity.
+On first run, Agora generates a `private.key` file (or `private_gpu<ID>.key` for multi-GPU setups). This is your node's cryptographic identity.
 
 - **Required** for secure communication within the swarm
 - **Keep it private** — never share or commit it

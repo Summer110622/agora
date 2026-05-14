@@ -1,4 +1,4 @@
-# Copyright 2025 Pluralis Research
+# Copyright 2026 Pluralis Research
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -68,6 +68,8 @@ GPU_PEAK_FLOPS = {
     "RTX 5070 Ti":  {"fp32": 43.9e12,  "tf32": 43.9e12,   "bf16": 87.8e12},
     "RTX 5070":     {"fp32": 30.9e12,  "tf32": 30.9e12,   "bf16": 61.8e12},
     "RTX 5060 Ti":  {"fp32": 23.7e12,  "tf32": 23.7e12,   "bf16": 47.4e12},
+    # Grace Blackwell — DGX Spark
+    "GB10":         {"fp32": 18.5e12,  "tf32": 18.5e12,    "bf16": 96.9e12},     # DGX Spark / GB10 from public benchmark.
 }
 # fmt: on
 

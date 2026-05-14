@@ -49,7 +49,7 @@ state_avg_config:
     reducer_timeout: 60.0
     sparse_avg: 0.05
     reuse_tensors: false
-    state_compression: agora_server.core.averaging.compression.BFloat16Compression
+    compression: hivemind.compression.NoCompression
     delta_rule_averaging: true
 
 # Training
@@ -58,5 +58,5 @@ use_torch_compile: true
 compile_warmup_batches: 2
 no_optim_params: [rcv, fixed_tok_embeddings]
 scheduler: linear
-num_training_steps: 100000
+num_training_steps: 154900
 num_warmup_steps: 4000

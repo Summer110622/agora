@@ -1,4 +1,4 @@
-# Copyright 2025 Pluralis Research
+# Copyright 2026 Pluralis Research
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -243,9 +243,9 @@ def _transform_latency(m: re.Match, _msg: str) -> list[tuple[str, str]]:
 # Ghost-phase patterns
 # ---------------------------------------------------------------------------
 
-_RE_GHOST_ENTER = re.compile(r"Entering ghost phase 1 at epoch \d+")
-_RE_GHOST_PHASE2 = re.compile(r"Transitioning to ghost phase 2 at \d+ local epoch")
 _RE_GHOST_EXIT = re.compile(r"Exiting ghost mode at \d+ local epoch")
+_RE_GHOST_PHASE1_DURATION = re.compile(r"Ghost phase 1 will last (\d+) steps, ending at local epoch (\d+)")
+_RE_GHOST_PHASE2_DURATION = re.compile(r"Ghost phase 2 will last (\d+) steps, ending at local epoch (\d+)")
 
 
 # ---------------------------------------------------------------------------
@@ -291,7 +291,7 @@ _TAG_STYLE: dict[str, str] = {
     "SERVER": TextStyle.BLUE,
     "TRAINING": _GREEN,
     "PROGRESS": _YELLOW,
-    "WARMUP": _CYAN,
+    "SYNC": _CYAN,
     "WARNING": TextStyle.ORANGE,
     "ERROR": TextStyle.RED,
 }
@@ -311,7 +311,7 @@ class CLILogFilter(logging.Filter):
 
     def __init__(self, name: str = "") -> None:
         super().__init__(name)
-        self._in_warmup: bool = False
+        self._sync_phase: str | None = None
 
     def filter(self, record: logging.LogRecord) -> bool:
         if record.levelno >= logging.WARNING:
@@ -322,25 +322,44 @@ class CLILogFilter(logging.Filter):
         msg = record.getMessage()
 
         # Ghost-phase state transitions
-        if _RE_GHOST_ENTER.search(msg):
-            self._in_warmup = True
-            record.cli_lines = [("WARMUP", "Node warmup started, catching up with other nodes")]
-            record.cli_tag = "WARMUP"
+        m = _RE_GHOST_PHASE1_DURATION.search(msg)
+        if m:
+            self._sync_phase = "phase1"
+            steps, end = m.group(1), m.group(2)
+            record.cli_lines = [
+                ("SYNC", "Synchronising weights with peers. Node won't process batches in this phase."),
+                ("SYNC", f"This phase will last {steps} steps (until local epoch {end})."),
+            ]
+            record.cli_tag = "SYNC"
             return True
 
-        if _RE_GHOST_PHASE2.search(msg) or _RE_GHOST_EXIT.search(msg):
-            if self._in_warmup:
-                self._in_warmup = False
-                record.cli_lines = [("WARMUP", "Node warmup complete")]
-                record.cli_tag = "WARMUP"
+        m = _RE_GHOST_PHASE2_DURATION.search(msg)
+        if m:
+            self._sync_phase = "phase2"
+            steps, end = m.group(1), m.group(2)
+            record.cli_lines = [
+                (
+                    "SYNC",
+                    "Synchronising optimizer state. Node is now processing batches, but doesn't contribute to weight averaging yet.",
+                ),
+                ("SYNC", f"This phase will last {steps} steps (until local epoch {end})."),
+            ]
+            record.cli_tag = "SYNC"
+            return True
+
+        if _RE_GHOST_EXIT.search(msg):
+            if self._sync_phase is not None:
+                self._sync_phase = None
+                record.cli_lines = [("SYNC", "Sync complete. Node is now fully contributing to training.")]
+                record.cli_tag = "SYNC"
                 return True
             return False
 
         for tag, pattern, transform in _CLI_PATTERNS:
             m = pattern.search(msg)
             if m:
-                # Suppress "Processed 0 batches" during warmup
-                if self._in_warmup and pattern is _RE_PROCESSED and m.group(1) == "0":
+                # Suppress "Processed 0 batches" during phase-1 sync (no batches are processed)
+                if self._sync_phase == "phase1" and pattern is _RE_PROCESSED and m.group(1) == "0":
                     return False
 
                 if transform is not None:

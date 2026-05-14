@@ -3,7 +3,7 @@
     "auth_server": "https://auth.pluralis.ai",
     "prom_gateway": "https://metrics.pluralis.ai",
     "seeds": [
-        "/ip4/3.142.93.219/tcp/29200/p2p/QmbqUu16DaUBVBXTuc8jtuy85yuZTMEYjxdQxxrARs7QN6",
-        "/ip4/18.222.138.86/tcp/29200/p2p/QmYqxM8wQPrXfehw5A9c8eBBuhCjAcJ9DBeQUDu7CHfTvN"
+        "/ip4/3.144.80.223/tcp/29200/p2p/QmUBiNAP5r1opYGoKghNFGHaN64fRTmn6ePRyiWoS6eSip",
+        "/ip4/3.133.58.47/tcp/29200/p2p/QmXxD3r54P3bP15fk6xVroBWUxnhqXPsBnti7XYEc7bZ9V"
     ]
 }
