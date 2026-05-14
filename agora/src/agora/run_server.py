@@ -1,6 +1,6 @@
 # This file contains code originally from Hivemind under MIT License
 # Original: Copyright 2020 Learning@home authors and collaborators
-# Modified by: Pluralis Research 2025
+# Modified by: Pluralis Research 2026
 #
 # Original code: MIT License (see THIRD_PARTY_LICENSES)
 # Modifications: Apache 2.0 License (see LICENSE)
@@ -29,6 +29,7 @@ from agora_server.core.server.server import Server
 from agora_server.logging.log_monitor import LogMonitor, MonitorRule
 from agora_server.logging.logger import PluralisLogger
 from agora_server.models.arguments_registry import ModelArgumentsRegistry
+from agora_server.monitor.gpu_util_monitor import GpuUtilizationTracker
 from agora_server.monitor.mem_monitor import MemoryTracker
 from agora_server.monitor.network_throughput import NetworkMonitor
 from agora_server.prometheus.monitor import WorkerPromMonitor
@@ -381,6 +382,8 @@ def main():
         # Log machine usage
         NetworkMonitor()
         MemoryTracker()
+        if torch.cuda.is_available():
+            GpuUtilizationTracker()
 
         # Start server
         server = Server.create(

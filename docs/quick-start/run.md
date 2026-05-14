@@ -1,16 +1,15 @@
 ---
-icon: play
-order: 80
+icon: material/play-circle
 ---
 
-# Running Node0
+# Running Agora
 
 ## Start the node
 
 ```bash
-git clone https://github.com/PluralisResearch/node0
-cd node0
-python3 node0_cli.py
+git clone https://github.com/PluralisResearch/agora
+cd agora
+python3 agora.py
 ```
 
 On first run, the CLI prompts you interactively for:
@@ -20,7 +19,7 @@ On first run, the CLI prompts you interactively for:
 - **GPU ID** if you have multiple GPUs
 - Whether to run inside **Docker** (recommended)
 
-Your answers are saved to a config file. Next time you run `python3 node0_cli.py` the saved values are reused — just run it and it picks up where you left off.
+Your answers are saved to a config file. Next time you run `python3 agora.py` the saved values are reused — just run it and it picks up where you left off.
 
 ---
 
@@ -30,15 +29,14 @@ We recommend **Docker** — it pins the exact Python version and dependencies, i
 
 If Docker isn't available, native install works but requires **Python 3.11 exactly** (not 3.10, not 3.12).
 
-!!!info Keep the node running after you log out
-If you're on a remote machine, run inside [`tmux`](https://github.com/tmux/tmux/wiki) or [`screen`](https://www.gnu.org/software/screen/) so the node doesn't die when your SSH session ends:
+!!! info "Keep the node running after you log out"
+    If you're on a remote machine, run inside [`tmux`](https://github.com/tmux/tmux/wiki) or [`screen`](https://www.gnu.org/software/screen/) so the node doesn't die when your SSH session ends:
 
-```bash
-tmux new -s node0
-python3 node0_cli.py
-# Ctrl-b d to detach; `tmux attach -t node0` to reattach
-```
-!!!
+    ```bash
+    tmux new -s agora
+    python3 agora.py
+    # Ctrl-b d to detach; `tmux attach -t agora` to reattach
+    ```
 
 ---
 
@@ -107,9 +105,9 @@ You can rejoin anytime. Your contribution history is preserved across restarts �
 
 ## Something went wrong?
 
-- **Error messages at startup** — check [Setup Guides](setup_guides/cloud.md), which cover auth failures, port tests, CUDA issues, and more
+- **Error messages at startup** — check [Setup Guides](setup-guides/cloud.md), which cover auth failures, port tests, CUDA issues, and more
 - **Node joined but isn't processing batches** — likely a network issue; verify port 49200 is reachable from outside
-- **Ask for help** — [Discord](https://discord.gg/GD2RGdYGKQ)
+- **Ask for help** — [Zulip](https://community.pluralis.ai/#narrow/channel/26-A---Contributor-Support)
 
 ---
 

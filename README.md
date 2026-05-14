@@ -6,9 +6,9 @@
 <div align="center">
     <a href="https://pluralis.ai/" target="_blank">
     <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="images/node0-logo-white.png">
-        <source media="(prefers-color-scheme: light)" srcset="images/node0-logo-black.png">
-        <img alt="PluralisResearch Node0 Logo" src="images/node0-logo-black.png" width="500px" style="max-width: 100%; margin-bottom: 30px">
+        <source media="(prefers-color-scheme: dark)" srcset="images/agora-logo-white.svg">
+        <source media="(prefers-color-scheme: light)" srcset="images/agora-logo-black.svg">
+        <img alt="PluralisResearch Agora Logo" src="images/agora-logo-black.svg" width="500px" style="max-width: 100%; margin-bottom: 30px">
     </picture>
     </a>
 </div>
@@ -17,8 +17,6 @@
     src="https://img.shields.io/badge/Dashboard-Online-62BB47"/></a>
     <a href="https://pluralis.ai/"><img alt="Website"
     src="https://img.shields.io/badge/PluralisResearch-Website-6F02B5"/></a>
-    <a href="https://discord.gg/GD2RGdYGKQ"><img alt="Discord"
-    src="https://img.shields.io/badge/Discord-Join-5865F2?logo=discord"/></a>
     <a href="https://pluralis.ai/dev/"><img alt="Docs"
     src="https://img.shields.io/badge/Docs-Website-C76e00"/></a>    
 </div>
@@ -26,7 +24,7 @@
 
 ## ✨ Description
 
-Node0 is a collaborative event powered by Protocol Learning, our decentralized approach to AI development.
+Agora is a collaborative event powered by Protocol Learning, our decentralized approach to AI development.
 
 This is the pretraining run open to the public that can use commodity hardware, so anyone can join and help train this model. This training run supports participants with compute resources as small as a 24GB consumer GPU (e.g., an Nvidia 4090). In this run, small devices are contributing to a global training cluster, demonstrating that the online community can collaboratively train massive models.
 
@@ -78,7 +76,7 @@ Each participant's progress is logged - check their contribution in the dashboar
 
 ### Cloud Services
 
-Follow ([cloud services](https://pluralis.ai/dev/quick_start/setup_guides/cloud/)) for how to set up cloud instances that meet the requirements.
+Follow ([cloud services](https://pluralis.ai/dev/quick-start/setup-guides/cloud/)) for how to set up cloud instances that meet the requirements.
 
 ### Authentication
 
@@ -86,21 +84,21 @@ Create HuggingFace access token ([instruction](https://huggingface.co/docs/hub/e
 
 ## 🚀 Getting Started
 
-Before joining, check the live wait time on the [Dashboard](https://dashboard.pluralis.ai/) (under the "Join" button). If joining is paused, check [Discord](https://discord.gg/GD2RGdYGKQ) for updates.
+Before joining, check the live wait time on the [Dashboard](https://dashboard.pluralis.ai/). If joining is paused, check with the team for updates.
 
 You will need a HuggingFace token — [create one here](https://huggingface.co/docs/hub/en/security-tokens) (no special permissions needed). Make sure port **49200** is open for inbound connections.
 
 Then run:
 
 ```bash
-git clone https://github.com/PluralisResearch/node0
-cd node0
-python3 node0_cli.py
+git clone https://github.com/PluralisResearch/agora
+cd agora
+python3 agora_cli.py
 ```
 
-The CLI will guide you through setup and start training. Your settings are saved automatically — next time, just run `python3 node0_cli.py` again.
+The CLI will guide you through setup and start training. Your settings are saved automatically — next time, just run `python3 agora_cli.py` again.
 
-Using an AI coding agent like Claude Code? Run it from inside the cloned repo and invoke `/node0-join` — the bundled skill ([`.claude/skills/node0-join/SKILL.md`](.claude/skills/node0-join/SKILL.md)) walks you through the same setup conversationally, launches the server, and watches the startup logs. Other agents (Cursor, Codex CLI) can read the same `SKILL.md` directly.
+Using an AI coding agent like Claude Code? Run it from inside the cloned repo and invoke `/agora-join` — the bundled skill ([`.claude/skills/agora-join/SKILL.md`](.claude/skills/agora-join/SKILL.md)) walks you through the same setup conversationally, launches the server, and watches the startup logs. Other agents (Cursor, Codex CLI) can read the same `SKILL.md` directly.
 
 We recommend running with **Docker**. If Docker is not available, **Python 3.11** (exact version) is required, and we recommend running inside [tmux](https://github.com/tmux/tmux/wiki) or [screen](https://www.gnu.org/software/screen/) so the server keeps running when you disconnect.
 
@@ -116,8 +114,8 @@ You can rejoin anytime — your contribution is saved.
 To use more than one GPU on the same machine, run one instance per GPU:
 
 ```bash
-python3 node0_cli.py --gpu_id 0
-python3 node0_cli.py --gpu_id 1
+python3 agora_cli.py --gpu_id 0
+python3 agora_cli.py --gpu_id 1
 ```
 
 When running natively, use a separate terminal for each GPU. When using Docker, each instance runs in its own container automatically.
@@ -144,14 +142,14 @@ The CLI prompts for everything interactively. You can also pass values directly:
 
 ### Manual Installation
 
-> This section is optional. `node0_cli.py` is the recommended way to install and run — it handles everything automatically. The instructions below are for advanced users.
+> This section is optional. `agora_cli.py` is the recommended way to install and run — it handles everything automatically. The instructions below are for advanced users.
 
 **Step 1 — Install dependencies**
 
 *Docker:*
 
 ```bash
-docker build . -t pluralis_node0 --label image_version=1
+docker build . -t pluralis_agora --label image_version=1
 ```
 
 *Native (no Docker):*
@@ -160,8 +158,8 @@ Requirements: Python 3.11, pip >= 25.3, NVIDIA GPU drivers with CUDA 12.8 suppor
 
 ```bash
 # Create and activate a Python 3.11 environment
-conda create -y -n node0 python=3.11
-conda activate node0
+conda create -y -n agora python=3.11
+conda activate agora
 
 # Upgrade pip
 pip install --upgrade "pip>=25.3"
@@ -170,8 +168,8 @@ pip install --upgrade "pip>=25.3"
 pip install torch==2.7.0 --index-url https://download.pytorch.org/whl/cu128
 
 # Install the two required packages from source
-pip install --build-constraint constraints.txt -e ./node0_server
-pip install --build-constraint constraints.txt -e ./node0
+pip install --build-constraint constraints.txt -e ./agora_server
+pip install --build-constraint constraints.txt -e ./agora
 ```
 
 **Step 2 — Read runtime parameters**
@@ -205,7 +203,7 @@ Default port convention: `49200 + gpu_id`. Each GPU on the same machine needs it
 *Native:*
 
 ```bash
-CUDA_VISIBLE_DEVICES=<gpu_id> python3.11 node0/src/node0/run_server.py \
+CUDA_VISIBLE_DEVICES=<gpu_id> python3.11 agora/src/agora/run_server.py \
   --gpu_id <gpu_id> \
   --config "$RUN_CONFIG" \
   --token <hf_token> \
@@ -222,11 +220,11 @@ CUDA_VISIBLE_DEVICES=<gpu_id> python3.11 node0/src/node0/run_server.py \
 *Docker:*
 
 ```bash
-docker run -d --name node0_gpu<gpu_id> --ipc=host --network=host \
+docker run -d --name agora_gpu<gpu_id> --ipc=host --network=host \
   --gpus device=<gpu_id> \
   -v $(pwd):/home -w /home \
-  pluralis_node0 \
-  bash -c "CUDA_VISIBLE_DEVICES=0 python3.11 node0/src/node0/run_server.py \
+  pluralis_agora \
+  bash -c "CUDA_VISIBLE_DEVICES=0 python3.11 agora/src/agora/run_server.py \
     --gpu_id <gpu_id> \
     --config $RUN_CONFIG \
     --token <hf_token> \
@@ -304,7 +302,7 @@ sudo chown -R <linux_user> <path/to/project>
 
 - **`Wrong pytorch version. Please install torch 2.7`**
 
-    A PyTorch version other than 2.7.x is installed. If running via `python3 node0_cli.py`, the CLI installs the correct version automatically. For manual installs, run: `pip install torch==2.7.0 --index-url https://download.pytorch.org/whl/cu128`.
+    A PyTorch version other than 2.7.x is installed. If running via `python3 agora_cli.py`, the CLI installs the correct version automatically. For manual installs, run: `pip install torch==2.7.0 --index-url https://download.pytorch.org/whl/cu128`.
 
 - **`CUDA is not available. Exiting run.`**
 
@@ -362,7 +360,7 @@ sudo chown -R <linux_user> <path/to/project>
 
 - **`CUDA out of memory`**
 
-    The batch size selected for your GPU's VRAM is too high (this can happen if other processes are using the same GPU, or on edge-case GPU models). Restart with a smaller batch size using `--batch_size_override <N>` (e.g. `python3 node0_cli.py --batch_size_override 1`). Lower the value until the error stops.
+    The batch size selected for your GPU's VRAM is too high (this can happen if other processes are using the same GPU, or on edge-case GPU models). Restart with a smaller batch size using `--batch_size_override <N>` (e.g. `python3 agora_cli.py --batch_size_override 1`). Lower the value until the error stops.
 
 - **`RAM usage exceeded threshold. Exiting run.`**
 
@@ -377,17 +375,14 @@ sudo chown -R <linux_user> <path/to/project>
 
 If you use this project in your research, please cite:
 
-
-Gil Avraham*, Yan Zuo*, Violetta Shevchenko, Hadi Mohaghegh Dolatabadi, Thalaiyasingam Ajanthan, Sameera Ramasinghe, Chamin Hewa Koneputugodage, and Alexander Long. **Node0: Model Parallel Training over the Internet with Protocol Models**. 2025.
-
-**equal contribution*
+Gil Avraham, Violetta Shevchenko, Karol Pajak, James Snewin, Harry Xi, Hadi Mohaghegh Dolatabadi, Thalaiyasingam Ajanthan, Sameera Ramasinghe, Chamin Hewa Koneputugodage, Shamane Siriwardhana, Alexander Long. **Pluralis 8b: Asynchronous Large-Scale Distributed Training over the Internet**. 2026.
 
 ```bibtex
-@misc{avraham2025node0,
-    title={Node0: Model Parallel Training over the Internet with Protocol Models}, 
-    author={Gil Avraham and Yan Zuo and Violetta Shevchenko and Hadi Mohaghegh Dolatabadi and Thalaiyasingam Ajanthan and Sameera Ramasinghe and Chamin Hewa Koneputugodage and Alexander Long},
-    year={2025},
-    url={https://github.com/PluralisResearch/node0}, 
+@misc{avraham2026agora,
+    title={Pluralis 8b: Asynchronous Large-Scale Distributed Training over the Internet}, 
+    author={Gil Avraham and Violetta Shevchenko and Karol Pajak and James Snewin and Harry Xi and Hadi Mohaghegh Dolatabadi and Thalaiyasingam Ajanthan and Sameera Ramasinghe and Chamin Hewa Koneputugodage and Shamane Siriwardhana and Alexander Long},
+    year={2026},
+    url={https://github.com/PluralisResearch/agora}, 
 }
 ```
 
