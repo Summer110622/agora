@@ -3,6 +3,7 @@
 <!-- markdownlint-disable no-duplicate-header -->
 
 <!-- docs-exclude-start -->
+<!-- TODO(design): replace node0-logo-{white,black}.png with the Agora banner. -->
 <div align="center">
     <a href="https://pluralis.ai/" target="_blank">
     <picture>
@@ -26,20 +27,18 @@
 
 Agora is a collaborative event powered by Protocol Learning, our decentralized approach to AI development.
 
-This is the pretraining run open to the public that can use commodity hardware, so anyone can join and help train this model. This training run supports participants with compute resources as small as a 24GB consumer GPU (e.g., an Nvidia 4090). In this run, small devices are contributing to a global training cluster, demonstrating that the online community can collaboratively train massive models.
+Anyone with a 24 GB consumer GPU (e.g. an NVIDIA RTX 4090) can participate. Each participant hosts one pipeline stage of the model; participants can join and leave at any time, and adding more peers per stage increases data-parallel throughput within that stage.
 
-Each participant (node) holds a small portion of the model's computation graph. Despite being connected over the internet (which has 100x slower speeds compared to datacenter connections), we are able to achieve training speeds and performances on par with centralized systems, utilizing the same amount of compute. The swarm of nodes is fully dynamic, meaning participants can join and leave at any time. As a result, the system scales horizontally – the more nodes join, the faster training proceeds.
+By pooling compute from many sources, Agora makes it feasible to train larger models than any single participant's hardware could handle alone.
 
-Because decentralized protocols allow us to pool compute resources from many sources, they enable access to more computational power than is typically available in centralized datacenters. This opens up the possibility to train larger models than ever before, giving the community the ability to push the boundaries of AI training.
-
-This is a hands-on demonstration of our vision: to make AI more accessible and less centralized by pooling compute resources from a global community.
+Full documentation: [pluralis.ai/dev](https://pluralis.ai/dev/).
 
 <!-- docs-exclude-start -->
 Each participant's progress is logged - check their contribution in the dashboard.
 
 <div align="center">
   <a href="https://dashboard.pluralis.ai/">
-    <img src="docs/images/dashboard-button.svg" alt="Live Dashboard"/>
+    <img src="images/dashboard-button.svg" alt="Live Dashboard"/>
   </a>
 </div>
       
@@ -352,7 +351,7 @@ sudo chown -R <linux_user> <path/to/project>
 
 - **`Too many failed all-reduce attempts. Exiting run.`**
 
-    Multiple consecutive gradient/parameter averaging rounds timed out, indicating the node's internet connection is too slow or unstable. Check your connection speed and restart.
+    Multiple consecutive parameter averaging rounds timed out, indicating the node's internet connection is too slow or unstable. Check your connection speed and restart.
 
 - **`Failed to connect to CUDA. Exiting run.`**
 
@@ -399,6 +398,22 @@ Sameera Ramasinghe, Thalaiyasingam Ajanthan, Gil Avraham, Yan Zuo, and Alexander
     archivePrefix={arXiv},
     primaryClass={cs.LG},
     url={https://arxiv.org/abs/2506.01260}, 
+}
+```
+
+ &nbsp;
+
+Pluralis Research. [AsyncMesh: Fully Asynchronous Optimization for Data and Pipeline Parallelism](https://arxiv.org/pdf/2601.22442). 2026. *The SPARTA optimizer used in the live run.*
+
+```bibtex
+@misc{pluralis2026asyncmesh,
+    title={AsyncMesh: Fully Asynchronous Optimization for Data and Pipeline Parallelism},
+    author={Pluralis Research},
+    year={2026},
+    eprint={2601.22442},
+    archivePrefix={arXiv},
+    primaryClass={cs.LG},
+    url={https://arxiv.org/abs/2601.22442},
 }
 ```
 

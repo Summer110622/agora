@@ -191,6 +191,15 @@ body, .md-typeset {
   line-height: 1.45;
   color: var(--p-text);
 }
+
+/* Body prose justifies to both edges. Figcaptions, headings, admonition
+   titles, table cells, and code blocks aren't <p>/<li>, so they keep
+   their own alignment. */
+.md-typeset p,
+.md-typeset li {
+  text-align: justify;
+  hyphens: auto;
+}
 /* All code (inline + block, in prose or in callouts) at one compact
    monospace size — 14 px. Smaller than 17 px body, distinct from
    surrounding prose, consistent everywhere. */
@@ -206,6 +215,25 @@ body, .md-typeset {
 }
 .md-typeset code { color: var(--p-code-link); background: var(--p-bg-soft); padding: 1px 4px; border-radius: 3px; }
 .md-typeset pre code { color: inherit; background: none; padding: 0; }
+
+/* Pygments syntax-highlighting tokens that ship red in Material's
+   default theme — numbers (`.m` / `.mi` / `.mf` / `.mh` / `.mo` /
+   `.mb` / `.il`) and string-escape sequences (`.se`) — read as
+   error markers in the Pluralis palette where red is reserved for
+   actual failure. Map them to inherit the surrounding code text
+   colour so a literal `0` or `\n` looks like part of the line, not
+   a highlighted alert. Covers both bash-style `--gpu_id 0` numbers
+   and backslash escapes inside heredocs / shell snippets. */
+.md-typeset code .m,
+.md-typeset code .mb,
+.md-typeset code .mf,
+.md-typeset code .mh,
+.md-typeset code .mi,
+.md-typeset code .mo,
+.md-typeset code .il,
+.md-typeset code .se {
+  color: inherit;
+}
 .md-typeset pre {
   background: var(--p-bg-soft);
   border: 1px solid var(--c-border-soft);
@@ -240,16 +268,6 @@ body, .md-typeset {
 .md-typeset h3 { font-weight: 400; font-size: 1rem;    margin: 1.4rem 0 0.3rem; color: var(--p-text-strong); letter-spacing: 0; }
 .md-typeset h4 { font-weight: 600; font-size: 0.95rem; margin: 1.2rem 0 0.3rem; color: var(--p-text-strong); }
 
-/* Hero subtitle / lede paragraph — opening paragraph after an H1 OR
-   any paragraph explicitly marked with `class="lede"` reads slightly
-   bigger and muted gray, like a Stripe / Goodfire intro lead. */
-.md-typeset h1 + p,
-.md-typeset .lede,
-.md-typeset p.lede {
-  font-size: 1.05rem;
-  color: var(--p-muted);
-}
-
 /* Task list checkboxes — Material's default is too pale on white. Use
    a darker gray for unchecked, Pluralis link blue for checked. */
 .md-typeset .task-list-indicator::before {
@@ -261,9 +279,16 @@ body, .md-typeset {
 }
 
 /* Tables — header slightly bigger than body, cells slightly smaller.
-   Distinct visual hierarchy without relying on bold weight alone. */
+   Distinct visual hierarchy without relying on bold weight alone.
+   Tables size to content (not stretched to 100%); if the natural width
+   exceeds the column, the table scrolls horizontally rather than
+   wrapping every cell to fit. */
 .md-typeset table:not([class]) {
   font-size: 1em;
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
 }
 .md-typeset table:not([class]) th {
   font-size: 18px;                  /* slightly bigger than 17 px body */
@@ -271,18 +296,23 @@ body, .md-typeset {
   color: var(--p-text-strong);
   background: transparent;
   border-bottom: 2px solid var(--c-border-strong);
+  white-space: nowrap;              /* headers stay on one line */
 }
 .md-typeset table:not([class]) td {
   font-size: 15px;                  /* slightly smaller than body */
   border-bottom: 1px solid var(--c-border-soft);
+  white-space: nowrap;              /* body cells stay on one line too */
+}
+/* Inline code in table cells doesn't break either. */
+.md-typeset table:not([class]) code {
+  white-space: nowrap;
 }
 
 /* Sidebar and on-this-page TOC */
 .md-sidebar--secondary {
   width: 14rem;
-  /* Layer above the article column so wide diagrams (swarm-fig
-     extends past the article at ≥1220 px) sit underneath the TOC
-     visually. The white nav block below does the actual occluding. */
+  /* Keep TOC above wide diagrams that scroll horizontally; the white
+     nav block below does the actual occluding. */
   z-index: 2;
 }
 /* Opaque white background ONLY behind the actual TOC list (and title),
@@ -294,6 +324,13 @@ body, .md-typeset {
 .md-sidebar--secondary .md-nav--secondary {
   background: var(--c-bg);
   box-shadow: -1rem 0 0 var(--c-bg), 1rem 0 0 var(--c-bg);
+  /* The body background is also white, so the white card and the
+     body bleed into each other below the last item — visually the
+     card looks like it has no end. A thin bottom rule makes the
+     boundary perceptible without introducing a card outline on the
+     sides. */
+  border-bottom: 1px solid var(--c-border-soft);
+  padding-bottom: 4px;
 }
 .md-nav__title[for="__toc"] {
   font-family: var(--p-font-body);
@@ -374,25 +411,61 @@ body, .md-typeset {
   border-bottom: 1px solid var(--c-border-soft);
   padding: 24px 0 18px;
   width: 100%;
-  overflow-x: auto;
+  /* Was overflow-x: auto, which clipped the 1100 px+ swarm-fig at the
+     650 px article column edge and offered a horizontal scrollbar.
+     Result: the diagram looked like it was being clipped by a white
+     overlay on the right. We'd rather have the wide diagram break
+     out to the right of the column into the gutter where the ToC
+     sidebar sits — it's still occluded vertically where the ToC
+     overlaps (intentional, via the nav's white box-shadow side-bleed),
+     but visible below the ToC. The narrow-viewport @media query at
+     1219 px already reflows the swarm-fig to width:100%, so this only
+     overflows on the wide layout where there's room. */
+  overflow-x: visible;
+  /* Establish a stacking context so the gray-extension pseudo-element
+     below can sit behind the diagram (z-index: -1) without sliding
+     behind unrelated page chrome. */
+  position: relative;
+  isolation: isolate;
+}
+/* Extend the figure's soft-gray surface to cover the swarm-fig's
+   natural right overflow without growing the diagram itself. The
+   swarm-fig is the only diagram on the site that overflows the
+   article column; worker-fig / trainer-fig / ssn-fig all fit inside.
+   We scope this with :has(.swarm-fig) so the extension only paints
+   when needed. Width = available gutter (100vw - 100% of figure),
+   capped at 750 px (swarm-fig max-width 1400 minus column min-width
+   ~650). `html { overflow-x: hidden }` clips at the viewport edge
+   regardless, but the cap keeps the painted region from extending
+   far past the diagram on ultra-wide viewports. */
+.md-typeset figure.agora-figure:has(.swarm-fig)::after {
+  content: '';
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  left: 100%;
+  /* The swarm-fig's natural rendered width is exactly its min-width
+     (1100 px) now that its internal horizontal padding is removed —
+     the zones span flush to its edges, so width of the gray
+     extension = diagram width − figure width = 1100 − 100%. Capped
+     by max-width so it never extends past the viewport edge. */
+  width: calc(1100px - 100%);
+  max-width: calc(100vw - 100%);
+  background: var(--p-bg-figure);
+  border-top: 1px solid var(--c-border-soft);
+  border-bottom: 1px solid var(--c-border-soft);
+  box-sizing: border-box;
+  z-index: -1;
+  pointer-events: none;
 }
 
-/* Wide architecture diagrams (.swarm-fig has min-width: 1100px) get to
-   extend BEYOND the article column to the right. The gray figure
-   surround sizes EXACTLY to the diagram — no extra padding left or
-   right of it. Falls back to the inner-scroll behaviour on narrow
-   viewports.                                                          */
-@media (min-width: 1220px) {
-  .md-typeset figure.agora-figure:has(.swarm-fig) {
-    width: max-content;
-    max-width: none;
-    margin-right: 0;
-    overflow-x: visible;
-  }
-  .md-typeset figure.agora-figure .swarm-fig {
-    padding: 0;       /* drop the inner 24px so the gray hugs the diagram */
-    margin: 0;        /* no auto-centering inside the figure */
-  }
+/* Architecture diagrams: align to the article column's left edge so
+   any overflow only goes to the right (into the gutter). margin: auto
+   would attempt to centre and pull the diagram off the left edge of
+   the column on wide viewports, which we don't want — we want the
+   left edge of the diagram to line up with the prose. */
+.md-typeset figure.agora-figure .swarm-fig {
+  margin: 0;
 }
 .md-typeset figure.agora-figure figcaption {
   font-size: 13px;       /* smaller than diagram body (max 16 px) and prose (17 px) */
@@ -408,7 +481,10 @@ body, .md-typeset {
 /* Inline colour cues in figcaptions — match the arrow colour for the
    referenced flow so the legend in the caption reads like the diagram. */
 .md-typeset figure.agora-figure figcaption .fig-forward {
-  color: var(--c-link); font-weight: 600; font-style: normal;
+  /* Forward direction is red across all diagrams (swarm-fig arrow,
+     trainer-fig arrow, ssn-fig compressed-activation arrow) — keep
+     this figcaption legend marker matched. */
+  color: var(--p-red); font-weight: 600; font-style: normal;
 }
 .md-typeset figure.agora-figure figcaption .fig-backward {
   color: var(--c-warn); font-weight: 600; font-style: normal;
@@ -429,9 +505,80 @@ body, .md-typeset {
 .md-typeset .swarm-fig,
 .md-typeset .agora-hero,
 .md-typeset .ssn-fig,
-.md-typeset .ipc-fig {
+.md-typeset .ipc-fig,
+.md-typeset .worker-fig,
+.md-typeset .trainer-fig {
   font-family: 'Inter', -apple-system, system-ui, 'Helvetica Neue', Arial, sans-serif;
 }
+
+/* ── Worker internals diagram ─────────────────────────────── */
+.worker-fig {
+  display: block;
+  margin: 0 auto;
+  padding: 18px 16px;
+  background: #ffffff;
+  /* Perimeter matches the trainer-fig card: thin soft-gray rule
+     instead of the previous 2 px blue accent, so the two diagrams
+     on the page read with the same framing style. */
+  border: 1px solid var(--c-border-soft);
+  border-radius: var(--radius-card);
+  max-width: 880px;
+  box-sizing: border-box;
+}
+.worker-fig .worker-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--c-link);
+  margin-bottom: 14px; text-align: center;
+}
+.worker-fig .worker-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  /* belt-and-braces against Material's .md-typeset div spacing */
+  margin: 0;
+}
+.worker-fig .wc-cell {
+  flex: 1 1 calc(33.333% - 10px);
+  min-width: 200px;
+  background: var(--c-bg-figure);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  box-sizing: border-box;
+  /* reset Material's vertical rhythm so cells sit flush in the grid */
+  margin: 0;
+}
+.worker-fig .wc-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--c-list);
+  margin: 0 0 3px 0;
+}
+.worker-fig .wc-desc {
+  font-size: 11px;
+  color: var(--c-muted);
+  line-height: 1.4;
+  margin: 0;
+}
+.worker-fig .wc-cell.accent {
+  background: var(--c-link-bg);
+  border-color: #d0e0f0;
+}
+.worker-fig .wc-cell.accent .wc-name { color: var(--c-link); }
+
+/* ── Trainer-to-workers pipeline diagram ──────────────────── */
+.trainer-fig {
+  margin: 24px 0;
+  padding: 22px 20px;
+  /* White bg so the diagram's bounding box reads as a card sitting
+     on top of the figure's gray surface, instead of gray-on-gray
+     where only the 1 px border defined the perimeter. Matches the
+     worker-fig pattern (white card on gray figure). */
+  background: var(--p-bg);
+  border: 1px solid var(--c-border-soft);
+  border-radius: var(--radius-card);
+}
+.trainer-fig svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
 
 /* Semantic term highlighting (Goodfire-style) */
 .t-discovery { color: var(--c-discovery); font-weight: 500; }
@@ -442,8 +589,15 @@ body, .md-typeset {
 .t-backward  { color: var(--c-backward);  font-weight: 500; }
 
 /* ── Body & typography (override retype defaults) ─────────── */
+/* NB: the variable used to be the never-defined `--font-body`, which
+   silently resolved to `initial` and fell back to browser-default
+   Times. Every page was rendering body, header repo link, and footer
+   prev/next nav in a serif font as a result. Fixed to the proper
+   `--p-font-body` (Inter sans stack) so the whole site picks up the
+   sans body and the same applies to the .md-source repo handle and
+   the .md-footer__link Previous/Next pagination chrome. */
 html body {
-  font-family: var(--font-body);
+  font-family: var(--p-font-body);
   background: var(--c-bg);
   color: var(--c-text);
   line-height: 1.7;
@@ -479,7 +633,7 @@ main hr, .markdown-section hr { border: none; border-top: 1px solid var(--c-bord
 
 /* ── Code (inline + block) ────────────────────────────────── */
 main code, .markdown-section code {
-  font-family: var(--font-code);
+  font-family: var(--p-font-code);
   font-size: 13px;
   background: var(--c-bg-code);
   padding: 1px 4px;
@@ -599,7 +753,13 @@ main tbody tr:hover, .markdown-section tbody tr:hover { background: var(--c-bg-s
 /* ── Architecture / pipeline-zone diagram ─────────────────── */
 .swarm-fig {
   width: fit-content; min-width: 1100px; max-width: 1400px;
-  margin: 0 auto; padding: 0 24px;
+  /* Was `padding: 0 24px` — that put a 24 px gray gutter between the
+     zone borders and the figure's gray-bg edge on both sides, which
+     read as inconsistent with worker-fig / trainer-fig / ssn-fig
+     (where the diagram visually touches the figure container's
+     edges). Removed so the zones span flush to the gray surface,
+     matching the other diagrams on the page. */
+  margin: 0 auto; padding: 0;
 }
 .swarm-fig .fig-header { margin-bottom: 14px; }
 .swarm-fig .fig-header h2 { font-size: 22px; margin: 0 0 4px; }
@@ -708,12 +868,24 @@ main tbody tr:hover, .markdown-section tbody tr:hover { background: var(--c-bg-s
 }
 .swarm-fig .payload-what { font-size: 11px; font-weight: 600; color: var(--c-list); line-height: 1.3; }
 .swarm-fig .payload-size { font-size: 10px; color: var(--c-muted-soft); margin-top: 2px; }
+/* Inline <code> inside the payload labels was inheriting the global
+   14 px code size, dwarfing the 10–11 px label text around it (e.g.
+   `grad_input` rendered nearly 50% larger than "Backward pass"). Pin
+   it to the surrounding label's size so it reads as part of the same
+   line of text rather than a separate inset chip. */
+.swarm-fig .flow-payload code {
+  font-size: inherit;
+  padding: 0 2px;
+  border-radius: 2px;
+}
 
-.swarm-fig .flow-forward .line { background: var(--c-link); }
-.swarm-fig .flow-forward .head-right { border-left: 6px solid var(--c-link); }
-/* Mirrored direction: same blue, points LEFT. Used where data-going-INTO-
+/* Forward direction is red across diagrams (matches .fig-forward in
+   the figcaption legend). */
+.swarm-fig .flow-forward .line { background: var(--p-red); }
+.swarm-fig .flow-forward .head-right { border-left: 6px solid var(--p-red); }
+/* Mirrored direction: same red, points LEFT. Used where data-going-INTO-
    compute travels right-to-left in the layout (e.g. IPC: Trainer → Workers). */
-.swarm-fig .flow-forward .head-left { border-right: 6px solid var(--c-link); }
+.swarm-fig .flow-forward .head-left { border-right: 6px solid var(--p-red); }
 .swarm-fig .flow-backward .line { background: var(--c-warn); }
 .swarm-fig .flow-backward .head-left { border-right: 6px solid var(--c-warn); }
 /* Mirrored direction: same yellow, points RIGHT. Used where data-coming-OUT-
@@ -865,7 +1037,9 @@ img.docs-screenshot, .docs-screenshot img {
 }
 
 /* ── Responsive ───────────────────────────────────────────── */
-@media (max-width: 1100px) {
+/* Below 1220 px the article column is too narrow for the horizontal
+   layout's 1100 px min-width, so the diagram reflows vertically here. */
+@media (max-width: 1219px) {
   .swarm-fig {
     min-width: 0; width: 100%; padding: 0;
   }

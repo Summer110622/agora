@@ -2,137 +2,91 @@
 icon: material/play-circle
 ---
 
-# Startup Sequence
+# Contributor Join Flow
 
-What happens when you launch a local Agora run.
-
-The startup flows through a chain of shell scripts: `local_run.sh` calls `setup_containers.sh` to provision Docker infrastructure, then `launch_agora.sh` execs into the container and runs `tmux_launcher.sh` to start all Agora processes.
+When a contributor's client starts, the swarm it is joining is already mid-run: peers are actively forwarding and backwarding microbatches, accumulating progress toward the next optimizer step, and running SPARTA averaging rounds. The new peer has to integrate without disrupting it. The sections below trace what happens from `python3 agora_cli.py` to the first batch this peer contributes.
 
 ---
 
-## Default Configuration
+## 1. Authorization
 
-```text
-CFG = llama/debug_sparta_async_C.yaml
-DHT = 3          # 3 DHT instances per seed
-STAGES = 2       # head + tail (no body stages)
-PIPES = 2        # 2 workers per stage = 4 workers total
-TRAINERS = 2     # 2 trainer processes
-TARGET_BS = 64   # target batch size per epoch
-GPUS = 1         # GPU count for round-robin assignment
+The first action the client performs is exchanging the contributor's HuggingFace token for a contributor slot. The auth service uses the token for identity only; no read/write scopes are required. A contributor **identity** is bound to the token. Any other peer started under the same token aggregates against the same identity on the leaderboard, so a multi-GPU contributor accumulates a single combined score. If the swarm is at capacity, the join is rejected at this step. If there is still room but other recent joins are still being integrated, the client waits briefly in the join queue; see [Queue](#3-queue). On success, a single log line confirms the slot and the assigned stage.
+
+---
+
+## 2. State download
+
+The worker has no parameters at this point. The auth service provides the client with a checkpoint URL pointing to S3 (a periodic snapshot of the assigned stage), and the client downloads the parameters and optimizer state directly from there over HTTPS. For Pluralis-8B at ~900M parameters per stage, this takes tens of seconds to a few minutes on a stable 200 Mbps link. This is the most bandwidth-sensitive step in the entire join flow; an unstable link manifests here before it manifests anywhere else.
+
+The S3 snapshot lags the live parameter state; it is published periodically, not on every step. Synchronizing to the swarm's current training state is the role of the sync phases described below.
+
+---
+
+## 3. Queue
+
+The queue is not an at-capacity waiting list: if the swarm is already full the join is rejected outright at authorization, with no waiting list. The queue paces incoming joins when there is still room: it prevents many simultaneous joins from overwhelming trainers and gives the swarm time to stabilize after each new peer joins. The client remains queued with the downloaded state retained, so when its position clears it transitions directly to sync mode without re-downloading. The client logs a position estimate once per minute, and live per-stage occupancy is on the [Dashboard](https://dashboard.pluralis.ai/) under **Overview**. If concurrent-join pacing is not required at authorization time, this step is skipped entirely.
+
+---
+
+## 4. Sync Phase 1: weight synchronisation
+
+The node is now formally in the swarm but invisible to trainers. Same-stage peers send the node the averaged parameters during each SPARTA round; the node's own weights are not yet incorporated into the average, and no batches are routed to it. The CLI prints:
+
+```
+[SYNC] Synchronising weights with peers. Node won't process batches in this phase.
+[SYNC] This phase will last <N> steps (until local epoch <E>).
 ```
 
----
+- **DHT record**: `sync_phase=1`, which trainers filter on to skip this peer.
+- **Averaging participation**: `weight=0`. The node reads the averaged parameters every round but contributes nothing back to the average.
+- **Duration**: typically several hours (`sync_phase1_steps`, currently 400 steps, ~20 SPARTA rounds).
 
-## Infrastructure Containers
-
-The `setup_containers.sh` script starts several Docker containers on the host network. Only one is required for training with auth disabled:
-
-* **`agora`** — The main container where all Agora processes run. Mounts the entire repo at `/home/pluralis/dev` and has `--gpus all`.
-
-Additional containers (only needed with `--use_auth True` or for monitoring):
-
-* `postgres` — DB backend for authorization and health monitoring
-* `redis` — Rate limiting and hardware threshold checks
-* `prometheus` / `pushgateway` — Metrics scraping (ports 9090/9091)
-* `adminer` — Database web UI
+This allows the local weights to converge toward synchronization with the rest of the swarm before any updates begin to affect the average. **No compute points accrue during Phase 1** since the node is not processing batches yet, but presence points start crediting from this phase onward, since the peer is now reporting to DHT.
 
 ---
 
-## Process Startup Order
+## 5. Sync Phase 2: optimizer warm-up
 
-All processes run inside a single Docker container in separate tmux panes. The minimum set for training with auth disabled is: **Seeds → wait → Workers → Trainers**.
+Trainers now see the node. Real batches are routed to it, and the node processes them like any other peer. The node's weights still do not enter the SPARTA average. CLI:
 
-| Order | Process | tmux Session | Required? | Waits For |
-| --- | --- | --- | --- | --- |
-| 1 | Prometheus config | (inline) | No (monitoring) | Nothing |
-| 2 | Authorizer | `auth` | Only with use\_auth | Nothing (sleep 5 after) |
-| 3 | Seed 0 | `seed` pane 0 | **Yes** | Nothing |
-| 4 | Seed 1 | `seed` pane 1 | **Yes** | Nothing |
-| 5 | **WAIT** | — | **Yes** | Seed multiaddr files |
-| 6 | Workers (4 total) | `workers` | **Yes** | Seed addrs on disk |
-| 7 | Monitors (2) | `trainers` pane 0-1 | No (monitoring) | Nothing |
-| 8 | Trainers (2) | `trainers` pane 2-3 | **Yes** | Nothing |
+```
+[SYNC] Synchronising optimizer state. Node is now processing batches, but doesn't contribute to weight averaging yet.
+[SYNC] This phase will last <N> steps (until local epoch <E>).
+```
 
----
+- **DHT record**: `sync_phase=2`. Trainers route batches to the node.
+- **Local optimizer**: accumulates state and takes local steps as normal.
+- **Averaging participation**: still `weight=0`. The node receives but does not contribute.
+- **Progress counter**: samples processed in this phase do **not** count toward the per-stage `target_batch_size`; the node reports 0 to the progress tracker until sync exits.
+- **Duration**: `sync_phase2_steps` (currently 100 steps).
 
-## Port Allocation
-
-Each worker receives a deterministic port and GPU assignment based on its index. For a default 4-worker setup (2 stages, 2 pipes):
-
-| Worker | Stage | Pipe | Port | Role |
-| --- | --- | --- | --- | --- |
-| Worker 0 | Head | 0 | 12000 | Seed peer (init from scratch) |
-| Worker 1 | Tail | 0 | 12010 | Seed peer (init from scratch) |
-| Worker 2 | Head | 1 | 12020 | Downloads state from peers |
-| Worker 3 | Tail | 1 | 12030 | Downloads state from peers |
-
-*Ports are allocated by `tmux_launcher.sh`, not enforced server-side — the formula `12000 + 10 * worker_index` is a launch-script convention.*
+The purpose of Phase 2 is to warm up the local optimizer state (AdamW moments and gradient norms) so that when the local weights begin contributing to averaging, their update direction is in agreement with the rest of the swarm. Because the node is processing real batches in this phase, its FLOPs are accumulated by the metrics server, and **compute points start accruing here** (presence points have been accruing since Phase 1).
 
 ---
 
-## Inter-Process Communication
+## 6. Active
 
-<figure class="agora-figure" markdown="0">
-<div class="ipc-fig">
-<svg viewBox="0 0 760 440" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Inter-process communication sequence diagram — Seeds, Workers, Trainers">
-  <defs>
-    <marker id="ipc-arr-disc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#1a7f37"/></marker>
-    <marker id="ipc-arr-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#0969da"/></marker>
-    <marker id="ipc-arr-warn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#bf8700"/></marker>
-    <marker id="ipc-arr-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#666"/></marker>
-  </defs>
+After Phase 2 exits, the node is a fully participating peer. CLI:
 
-  <!-- Actor header boxes -->
-  <rect x="60" y="20" width="120" height="44" rx="6" fill="#ffffff" stroke="#0969da" stroke-width="1.5"/>
-  <text x="120" y="48" text-anchor="middle" font-family="Inter,sans-serif" font-size="14" font-weight="700" fill="#111">Seeds</text>
+```
+[SYNC] Sync complete. Node is now fully contributing to training.
+```
 
-  <rect x="320" y="20" width="120" height="44" rx="6" fill="#ffffff" stroke="#0969da" stroke-width="1.5"/>
-  <text x="380" y="48" text-anchor="middle" font-family="Inter,sans-serif" font-size="14" font-weight="700" fill="#111">Workers</text>
+- **DHT record**: `sync_phase=OFF`.
+- **Averaging participation**: the node's weights enter the SPARTA average at full weight.
+- **Progress counter**: the node's samples count toward the per-stage `target_batch_size`. Points continue to accrue as in Phase 2.
 
-  <rect x="580" y="20" width="120" height="44" rx="6" fill="#ffffff" stroke="#0969da" stroke-width="1.5"/>
-  <text x="640" y="48" text-anchor="middle" font-family="Inter,sans-serif" font-size="14" font-weight="700" fill="#111">Trainers</text>
+From here on the node processes batches indefinitely. If it disconnects, [Fault Tolerance](fault-tolerance.md) describes how the swarm handles the lost contribution and how a worker re-enters sync mode on rejoin if it has lagged too far behind.
 
-  <!-- Lifelines (dashed vertical lines) -->
-  <line x1="120" y1="64" x2="120" y2="420" stroke="#bbb" stroke-width="1" stroke-dasharray="4 4"/>
-  <line x1="380" y1="64" x2="380" y2="420" stroke="#bbb" stroke-width="1" stroke-dasharray="4 4"/>
-  <line x1="640" y1="64" x2="640" y2="420" stroke="#bbb" stroke-width="1" stroke-dasharray="4 4"/>
+---
 
-  <!-- "time ↓" gutter on left margin -->
-  <text x="22" y="90" font-family="Inter,sans-serif" font-size="10" font-weight="600" letter-spacing="1" fill="#999">TIME</text>
-  <line x1="30" y1="98" x2="30" y2="405" stroke="#ccc" stroke-width="1"/>
-  <path d="M26 400 L30 410 L34 400 z" fill="#ccc"/>
+## Summary
 
-  <!-- 1. Seeds → Workers: read multiaddr file (green arrow above the write self-loop) -->
-  <line x1="120" y1="95" x2="378" y2="95" stroke="#1a7f37" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#ipc-arr-disc)"/>
-  <text x="249" y="87" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" font-weight="600" fill="#1a7f37">read multiaddr file (via disk)</text>
-
-  <!-- 2. Seeds self-action: write multiaddress files -->
-  <path d="M120 135 L 170 135 L 170 155 L 126 155" fill="none" stroke="#666" stroke-width="1.5" marker-end="url(#ipc-arr-gray)"/>
-  <text x="180" y="148" font-family="Inter,sans-serif" font-size="12" fill="#444">write <tspan font-family="ui-monospace,Menlo,monospace" font-size="11">multiaddress0/1</tspan> to disk</text>
-
-  <!-- 3. Workers self: DHT peer discovery -->
-  <path d="M380 185 L 430 185 L 430 205 L 386 205" fill="none" stroke="#666" stroke-width="1.5" marker-end="url(#ipc-arr-gray)"/>
-  <text x="440" y="198" font-family="Inter,sans-serif" font-size="12" fill="#444">DHT peer discovery</text>
-
-  <!-- 4. Workers self: AllReduce within stage -->
-  <path d="M380 235 L 430 235 L 430 255 L 386 255" fill="none" stroke="#666" stroke-width="1.5" marker-end="url(#ipc-arr-gray)"/>
-  <text x="440" y="248" font-family="Inter,sans-serif" font-size="12" fill="#444"><tspan font-family="ui-monospace,Menlo,monospace" font-size="11">AllReduce</tspan> within stage (libp2p)</text>
-
-  <!-- 5. Seeds → Trainers: read multiaddr file -->
-  <line x1="120" y1="290" x2="638" y2="290" stroke="#1a7f37" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#ipc-arr-disc)"/>
-  <text x="380" y="282" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" font-weight="600" fill="#1a7f37">read multiaddr file (via disk)</text>
-
-  <!-- 6. Trainers → Workers: forward + backward calls (blue) -->
-  <line x1="640" y1="345" x2="382" y2="345" stroke="#0969da" stroke-width="1.5" marker-end="url(#ipc-arr-blue)"/>
-  <text x="511" y="337" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" font-weight="600" fill="#0969da">batches &amp; activations (libp2p gRPC)</text>
-
-  <!-- 7. Workers → Trainers: forward outputs + backward grad_input (yellow) -->
-  <line x1="380" y1="395" x2="638" y2="395" stroke="#bf8700" stroke-width="1.5" marker-end="url(#ipc-arr-warn)"/>
-  <text x="509" y="387" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" font-weight="600" fill="#bf8700">activations / loss / grad_input</text>
-</svg>
-</div>
-<figcaption>UML sequence diagram — time flows top to bottom. <span class="fig-discovery">Bootstrap</span> (green, dashed) is file-mediated via disk; runtime messages between Trainers and Workers are direct libp2p gRPC — <span class="fig-forward">batches &amp; activations in</span>, <span class="fig-backward">activations / loss / grad_input out</span>. Parameter gradients are computed on the workers and never cross the RPC boundary — the optimizer step happens locally. Self-loop arrows on the Workers lifeline are DHT discovery and within-stage <code>AllReduce</code>.</figcaption>
-</figure>
-
-With auth disabled, the only processes are seeds, workers, and trainers, communicating via DHT for peer discovery and libp2p for data transport. All processes run inside a single Docker container and communicate via localhost networking (`--network host`).
+| Step | DHT `sync_phase` | Visible to trainers? | Contributes to averaging? | Notes |
+|---|---|---|---|---|
+| 1. Authorization | — | — | — | Token validated, stage assigned; rejected if swarm is full |
+| 2. State download | — | No | No | Stale snapshot downloaded from S3 |
+| 3. Queue (if pacing needed) | — | No | No | Brief wait while concurrent joins are integrated |
+| 4. Sync Phase 1: weights | `1` | No | Receives only (`weight=0`) | Synchronize to live state; presence points only |
+| 5. Sync Phase 2: optimizer | `2` | Yes | Receives only (`weight=0`) | Warm up local optimizer; compute points start accruing |
+| 6. Active | `OFF` | Yes | Full weight | Steady-state contribution; compute and presence points accrue |

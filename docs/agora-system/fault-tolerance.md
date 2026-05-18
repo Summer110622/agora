@@ -2,55 +2,37 @@
 icon: material/shield-half-full
 ---
 
-# Fault Tolerance & Ghost Mode
+# Fault Tolerance
 
-How Agora keeps training alive when peers die mid-step, and how new workers join a swarm that's already running.
+Peers frequently disconnect, fail, or experience transient connection issues. Agora is built to be fault-tolerant and robust to these failure modes; the run is not stalled during crucial all-reduce operations, and valid work from healthy peers is preserved.
 
 ---
 
-## Worker Failure During AllReduce { .t-failure }
+## Peer Failure During AllReduce { .t-failure }
 
-The `AllReduce` protocol handles peer failures gracefully at multiple levels:
+An all-reduce round must tolerate slow or disconnecting peers partway through. The system divides tensors into smaller chunks and enforces a strict time limit for reducers to receive these chunks. Any failure in a peer sending its chunks (disconnect, bad connection) results in the sender being banned for the round, allowing the all-reduce to complete. The chunking preserves partial all-reduce results, so valid work from peers is not discarded. A reciprocal timeout mechanism protects the return path, where reducers send the reduced tensor chunks back. A full-round timeout protects against additional stalls from failed, disconnected, or slow peers; the round retains its partial all-reduce result.
 
-* **Sender timeout** — If a peer does not send data within the configured timeout, it is **banned** (excluded from the round).
-* **Mid-stream failure** — `register_failed_reducer()` marks the peer as failed and zeroes their missing contribution.
-* **Outcome** — The round completes with the remaining contributors. The weighted average is computed from whoever is still alive.
-* **No retry** — A failed round is logged and training continues. The next epoch's averaging round will try again with whoever is available.
-
-If **all** peers fail, the `AllReduce` raises a `MatchmakingException`, which is caught and logged. The `finished_averaging_round` flag is set to unblock the main thread, and training continues without averaging for that round.
+There is no retry: failures are logged and training continues. Subsequent matchmaking and all-reduce operations run independently of previous failures, with the caveat that contributors that consistently fail are removed from the swarm.
 
 !!! info "Key point"
-    A worker failure is fatal only if an entire pipeline stage empties. As long as at least one worker remains in each stage, the trainer can route batches and training continues.
+    A peer failure is fatal only if an entire pipeline stage empties. As long as at least one worker remains in each stage, the trainer can route batches and training continues.
 
 ---
 
-## Ghost Mode Lifecycle { .t-failure }
+## Stale-state re-integration (sync mode) { .t-failure }
 
-Ghost mode manages the lifecycle of workers that join a running swarm or have fallen behind. It prevents stale or uninitialized workers from corrupting the model by gradually integrating them.
+Sync mode is the mechanism by which a worker that is *behind* the swarm (re)joins it without biasing the live model toward its stale weights. The contributor-facing description is in [Contributor Join Flow](startup-sequence.md#4-sync-phase-1-weight-synchronisation); the fault-handling rule is:
 
-### Entry condition
+A worker enters sync mode whenever it has lagged more than `max_allowed_stale` training steps behind the swarm, which happens in three ways: it lagged during training, the swarm progressed past it while it was downloading initial state, or it restored from a stale checkpoint.
 
-A worker enters ghost mode when `global_epoch - local_epoch > max_allowed_stale`. This indicates the worker's state is too far behind the rest of the swarm to participate normally.
+In **Phase 1**, the worker is invisible to trainers (they parse the suffix and skip it) and joins SPARTA averaging rounds with `weight=0`, receiving the averaged parameters but contributing nothing.
 
-### Phase 1: receive-only
+In **Phase 2**, the worker becomes visible to trainers and starts processing batches, but still averages with `weight=0`. This is the optimizer-warmup phase: local optimizer state converges while the swarm's averaged parameters continue moving the worker's weights toward the live state.
 
-* The worker is **invisible to trainers** — it declares its current `ghost_phase` field on its DHT record (rather than a UID suffix), and trainers filter out workers in Phase 1.
-* Does **not** process batches (no forward/backward).
-* Participates in state averaging with `weight=0` — receives averaged parameters from peers but does not contribute its own.
-* Duration: `ghost_phase1_steps` local epochs.
-
-### Phase 2: warm-up
-
-* The worker becomes **visible to trainers** and **processes real batches** for optimizer warm-up.
-* Still uses `weight=0` in averaging — continues receiving without contributing.
-* Duration: `ghost_phase2_steps` local epochs.
-
-### Exit: full participation
-
-After completing both phases, the worker returns to `GhostPhase.OFF` and participates fully — contributing its weight to averaging and counting toward epoch progress.
+Once a worker exists the synchronization mode, it transitions to full participation: its weights contribute to averaging and its samples count toward step progress.
 
 ---
 
 ## Join Blocking Window
 
-To prevent state corruption from workers joining mid-`AllReduce`, new peers are blocked from joining during epochs near an averaging round. This ensures that new workers only download state during a stable window when no averaging is in flight and the parameters are consistent.
+The third failure mode is a peer joining mid-`AllReduce`: its state download would read parameters that are partway through being updated, and the result would be neither the pre-round nor the post-round model. To prevent that, new joins are blocked during the steps immediately around an averaging round. A joining peer can only download state during a stable window when no averaging round is in progress.

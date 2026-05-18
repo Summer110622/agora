@@ -4,9 +4,7 @@ icon: octicons/cpu-16
 
 # Training Architecture { .numbered }
 
-Pipeline-parallel training with DHT-based peer discovery, heterogeneous workers, and CPU-only trainers.
-
-The system is organized into three layers — **Discovery**, **Compute**, and **Coordination** — each owning a distinct responsibility. Together they enable distributed training across heterogeneous, untrusted hardware while ensuring no single participant holds complete model weights.
+Three layers compose an Agora training run. *Discovery* runs a stateless DHT for peer-to-peer addressing. *Compute* is the pipeline itself: workers, each holding one stage's parameters, running forward and backward. *Coordination* is a small set of CPU-only trainers that route microbatches through the pipeline and shard the dataset across them. The full system runs on heterogeneous, untrusted hardware without any one contributor holding the complete model weights.
 
 <figure class="agora-figure" markdown="0">
 <div class="swarm-fig">
@@ -15,7 +13,7 @@ The system is organized into three layers — **Discovery**, **Compute**, and **
       <div class="zone-header">
         <div class="zone-number">Discovery Layer</div>
         <div class="zone-title">Seeds</div>
-        <div class="zone-desc">DHT bootstrap nodes (Kademlia). Peer registration &amp; discovery.</div>
+        <div class="zone-desc">DHT bootstrap nodes. Peer registration &amp; discovery.</div>
       </div>
       <div class="zone-body">
         <div class="seed-item">
@@ -40,7 +38,7 @@ The system is organized into three layers — **Discovery**, **Compute**, and **
         <div class="flow-arrow-line flow-discovery"><div class="line"></div><div class="head-right"></div></div>
         <div class="flow-payload">
           <div class="payload-what">Multiaddr exchange</div>
-          <div class="payload-size">libp2p / Kademlia</div>
+          <div class="payload-size">libp2p / DHT</div>
         </div>
       </div>
     </div>
@@ -48,36 +46,43 @@ The system is organized into three layers — **Discovery**, **Compute**, and **
       <div class="zone-header">
         <div class="zone-number">Compute Layer</div>
         <div class="zone-title">Training Pipeline</div>
-        <div class="zone-desc">Workers hold model shards, process fwd/bwd, run periodic SPARTA state averaging within stage.</div>
+        <div class="zone-desc">Workers hold one pipeline stage's parameters, process fwd/bwd, run periodic SPARTA state averaging within their stage.</div>
       </div>
       <div class="zone-body">
         <div class="stage-grid">
           <div class="pipeline-stage head">
             <div class="stage-label">Stage 0</div>
             <div class="stage-name">Head</div>
-            <div class="worker-node"><div class="worker-label">Pipe 0</div><div class="worker-gpu">H100 80G</div><div class="worker-info">Layers 0&ndash;7, embed</div></div>
-            <div class="worker-node"><div class="worker-label">Pipe 1</div><div class="worker-gpu">H100 80G</div><div class="worker-info">Layers 0&ndash;7, embed</div></div>
+            <div class="worker-node"><div class="worker-label">Pipe 0</div><div class="worker-gpu">H100 80G</div><div class="worker-info">6 layers + embed</div></div>
+            <div class="worker-node"><div class="worker-label">Pipe 1</div><div class="worker-gpu">H100 80G</div><div class="worker-info">6 layers + embed</div></div>
             <div class="ar-bar"><div class="ar-label">SPARTA</div><div class="ar-detail">State averaging</div></div>
           </div>
           <div class="pipeline-stage">
             <div class="stage-label">Stage 1</div>
             <div class="stage-name">Body 1</div>
-            <div class="worker-node"><div class="worker-label">Pipe 0</div><div class="worker-gpu">RTX 4090</div><div class="worker-info">Layers 8&ndash;15</div></div>
-            <div class="worker-node"><div class="worker-label">Pipe 1</div><div class="worker-gpu">RTX 4090</div><div class="worker-info">Layers 8&ndash;15</div></div>
+            <div class="worker-node"><div class="worker-label">Pipe 0</div><div class="worker-gpu">RTX 4090</div><div class="worker-info">4 layers</div></div>
+            <div class="worker-node"><div class="worker-label">Pipe 1</div><div class="worker-gpu">RTX 4090</div><div class="worker-info">4 layers</div></div>
+            <div class="ar-bar"><div class="ar-label">SPARTA</div><div class="ar-detail">State averaging</div></div>
+          </div>
+          <div class="pipeline-stage ellipsis">
+            <div class="stage-label">…</div>
+            <div class="stage-name">Bodies 2–4</div>
+            <div class="worker-node"><div class="worker-label">Pipe 0</div><div class="worker-gpu">mixed</div><div class="worker-info">4 layers each</div></div>
+            <div class="worker-node"><div class="worker-label">Pipe 1</div><div class="worker-gpu">mixed</div><div class="worker-info">4 layers each</div></div>
             <div class="ar-bar"><div class="ar-label">SPARTA</div><div class="ar-detail">State averaging</div></div>
           </div>
           <div class="pipeline-stage">
-            <div class="stage-label">Stage 2</div>
-            <div class="stage-name">Body 2</div>
-            <div class="worker-node"><div class="worker-label">Pipe 0</div><div class="worker-gpu">L40S 48G</div><div class="worker-info">Layers 16&ndash;23</div></div>
-            <div class="worker-node"><div class="worker-label">Pipe 1</div><div class="worker-gpu">L40S 48G</div><div class="worker-info">Layers 16&ndash;23</div></div>
+            <div class="stage-label">Stage 5</div>
+            <div class="stage-name">Body 5</div>
+            <div class="worker-node"><div class="worker-label">Pipe 0</div><div class="worker-gpu">L40S 48G</div><div class="worker-info">4 layers</div></div>
+            <div class="worker-node"><div class="worker-label">Pipe 1</div><div class="worker-gpu">L40S 48G</div><div class="worker-info">4 layers</div></div>
             <div class="ar-bar"><div class="ar-label">SPARTA</div><div class="ar-detail">State averaging</div></div>
           </div>
           <div class="pipeline-stage tail">
-            <div class="stage-label">Stage 3</div>
+            <div class="stage-label">Stage 6</div>
             <div class="stage-name">Tail</div>
-            <div class="worker-node"><div class="worker-label">Pipe 0</div><div class="worker-gpu">A100 40G</div><div class="worker-info">Layers 24&ndash;31, lm_head</div></div>
-            <div class="worker-node"><div class="worker-label">Pipe 1</div><div class="worker-gpu">A100 40G</div><div class="worker-info">Layers 24&ndash;31, lm_head</div></div>
+            <div class="worker-node"><div class="worker-label">Pipe 0</div><div class="worker-gpu">A100 40G</div><div class="worker-info">6 layers + lm_head</div></div>
+            <div class="worker-node"><div class="worker-label">Pipe 1</div><div class="worker-gpu">A100 40G</div><div class="worker-info">6 layers + lm_head</div></div>
             <div class="ar-bar"><div class="ar-label">SPARTA</div><div class="ar-detail">State averaging</div></div>
           </div>
         </div>
@@ -85,7 +90,7 @@ The system is organized into three layers — **Discovery**, **Compute**, and **
       <div class="zone-footer">
         <div class="security-badge">
           <div class="badge-dot"></div>
-          <div class="badge-text"><strong>No party holds complete weights</strong> &mdash; mathematical guarantee.</div>
+          <div class="badge-text"><strong>Model split across stages</strong> &mdash; each worker holds one stage's parameters, not the full model.</div>
         </div>
       </div>
     </div>
@@ -96,9 +101,9 @@ The system is organized into three layers — **Discovery**, **Compute**, and **
         <div class="flow-payload"><div class="payload-what">Forward pass</div><div class="payload-size">Head &rarr; Body &rarr; Tail</div></div>
       </div>
       <div class="data-flow">
-        <div class="flow-direction">&larr; Gradients</div>
+        <div class="flow-direction">&larr; Activation gradients</div>
         <div class="flow-arrow-line flow-backward"><div class="line"></div><div class="head-left"></div></div>
-        <div class="flow-payload"><div class="payload-what">Backward pass</div><div class="payload-size">Tail &rarr; Body &rarr; Head</div></div>
+        <div class="flow-payload"><div class="payload-what">Backward pass</div><div class="payload-size">Tail &rarr; Body &rarr; Head (<code>grad_input</code> only)</div></div>
       </div>
     </div>
     <div class="zone trainer-zone">
@@ -122,29 +127,26 @@ The system is organized into three layers — **Discovery**, **Compute**, and **
       <div class="zone-footer">
         <div class="security-badge">
           <div class="badge-dot"></div>
-          <div class="badge-text"><strong>Pluralis-owned only</strong> &mdash; not on volunteer nodes.</div>
+          <div class="badge-text"><strong>Pluralis-owned only</strong> &mdash; not on contributor nodes.</div>
         </div>
       </div>
     </div>
   </div>
 </div>
-<figcaption>Three-zone Agora architecture — Discovery (Seeds), Compute (Workers), Coordination (Trainers). Heterogeneous example configuration; real swarms vary by participant hardware. <span class="fig-forward">Forward</span> activations flow Head → Body → Tail; <span class="fig-backward">backward</span> gradients flow Tail → Body → Head.</figcaption>
+<figcaption>Three-zone Agora architecture: Discovery (Seeds), Compute (Workers), Coordination (Trainers). Heterogeneous example configuration; real swarms vary by participant hardware. <span class="fig-forward">Forward</span> activations flow Head → Body → Tail; <span class="fig-backward">backward</span> activation gradients (<code>grad_input</code>) flow Tail → Body → Head. Parameter gradients never cross stage boundaries.</figcaption>
 </figure>
 
-!!! info "*Epoch* terminology"
-    In Agora, an **epoch** is a per-stage counter: every time the workers in a stage have collectively processed a number of batches equal to the target batch size, every worker in that stage increments its epoch counter by one. This is unrelated to a full pass over the dataset.
+## Discovery Layer { .t-discovery }
 
-## Discovery Layer — Seeds { .t-discovery }
+A seed is a stateless <span class="t-discovery">DHT</span> bootstrap. Workers query a seed for an entry point into the swarm and then communicate with other peers directly; the seed never stores model data of its own. Pluralis runs two seeds for redundancy: if Seed 0 is unreachable, Seed 1 serves the same role, and a new worker can bootstrap from either one.
 
-Seed nodes are stateless <span class="t-discovery">DHT</span> bootstrap peers — they help workers find each other but never store model data.
+## Compute Layer { .t-compute }
 
-## Workers { .t-compute }
+A worker holds the model parameters and performs the compute. It owns one pipeline stage (Head, Body, or Tail) and runs forward and backward passes for batches the trainer routes to it. Workers within the same stage participate together in periodic, async SPARTA averaging rounds. The [Workers section](#workers) below covers the runtime structure.
 
-Workers hold the actual model parameters. Each worker owns one pipeline stage (Head / Body / Tail), runs forward and backward passes, and participates in periodic SPARTA state averaging within its stage. Two pipes per stage give data-parallel redundancy and let SPARTA averaging run with at least two contributors. See the [Workers deep dive](#workers_1) for runtime structure.
+## Coordination Layer { .t-coord }
 
-## Coordination Layer — Trainers { .t-coord }
-
-Trainers hold no model parameters. They route microbatches through the pipeline, balance load across workers, and feed dataset shards into the run. They run on CPU and are kept on Pluralis-owned infrastructure — never deployed on volunteer nodes. See the [Trainers deep dive](#trainers) for fault tolerance and load-balancing logic.
+A trainer holds no model parameters. Its role is to orchestrate the pipeline: route microbatches to a healthy worker in each stage, balance load across the workers in each stage, and supply dataset shards. Trainers run on CPU and run on Pluralis-owned infrastructure rather than on contributor nodes; see the [Trainers section](#trainers) for fault-tolerance and load-balancing details.
 
 ---
 
@@ -152,124 +154,157 @@ Trainers hold no model parameters. They route microbatches through the pipeline,
 
 ### Workers
 
-Workers are the GPU-bound compute nodes of the system. Each worker holds the parameters for exactly one pipeline stage (head, body, or tail) and is responsible for running forward passes, backward passes, and participating in AllReduce for that stage.
+A worker is a single process holding one stage's parameters (one or more transformer layers). It performs forward and backward on those parameters, runs its own local optimizer to apply gradients, and joins same-stage peers in periodic `AllReduce` rounds for state averaging. A worker has no knowledge of the rest of the pipeline: only its own stage.
 
-#### Architecture
+<figure class="agora-figure" markdown="0">
+<div class="worker-fig">
+<div class="worker-label">Worker: Stage X</div>
+<div class="worker-grid">
+<div class="wc-cell"><div class="wc-name">Connection Handlers</div><div class="wc-desc">Listen for trainer gRPC requests; place batches in fwd / bwd queues. Multiplexed on the same port.</div></div>
+<div class="wc-cell accent"><div class="wc-name">Runtime</div><div class="wc-desc">Loops over fwd / bwd queues and dispatches batches into ModuleBackend for execution.</div></div>
+<div class="wc-cell"><div class="wc-name">ModuleBackend</div><div class="wc-desc">Stores the nn.Module for this stage. Owns the forward / backward task pools.</div></div>
+<div class="wc-cell"><div class="wc-name">DHTHandler</div><div class="wc-desc">Declares this Worker's availability in its stage (head.0.0, body1.0.1, …) for trainer + peer discovery.</div></div>
+<div class="wc-cell accent"><div class="wc-name">SPARTA Optimizer</div><div class="wc-desc">Accumulates gradients locally, runs the local optimizer step, then matches with same-stage peers and AllReduces 5% of parameters.</div></div>
+<div class="wc-cell"><div class="wc-name"><span class="t-discovery">DHT</span></div><div class="wc-desc">Hivemind Kademlia DHT. Peer discovery, expert registration, progress tracking, matchmaking.</div></div>
+</div>
+</div>
+<figcaption>Worker internals: six co-resident components inside a single Worker process. <strong>Runtime</strong> drives <strong>ModuleBackend</strong> for compute; the <strong>SPARTA Optimizer</strong> coordinates the parameter-averaging step with same-stage peers via the shared <strong>DHT</strong>.</figcaption>
+</figure>
 
-Each worker wraps a single **expert** — a sub-network corresponding to one pipeline stage. The model is split so that the head stage handles input embeddings and early transformer layers, body stages handle intermediate layers, and the tail stage handles the final layers and the language model head.
+#### DHT
 
-The expert is wrapped in `ModuleCollab`, a subclass of Hivemind's `ModuleBackend` that adds mixed-precision (BF16 autocast) and `torch.compile` support around the standard forward/backward task pools.
+Agora uses Hivemind's Kademlia DHT for four functions: peer discovery, expert registration, progress tracking, and matchmaking for `AllReduce`.
 
-Key properties of workers:
+#### ModuleBackend
 
-- Each worker gets a port allocated by the launch scripts (default convention: `12000 + 10 * worker_index`) and listens for gRPC requests from trainers.
-- **Pipe 0** workers receive the `--seed_peer` flag and initialize weights from scratch. All other workers download state from existing peers before beginning training.
-- Workers do not communicate with each other except during AllReduce rounds.
-- Each worker runs on a single GPU. Multiple workers may share a GPU in local testing.
+The `nn.Module` for this stage and the forward and backward functions the `Runtime` invokes. Also owns the two task pools (forward and backward) where incoming trainer requests queue up before the `Runtime` processes them.
 
-!!! info "SPARTA — Asynchronous Sparse Parameter Averaging"
-    The collaborative optimizer used by workers (`OptimizerAsyncSparta`) implements the SPARTA / AsyncMesh protocol. Paper: [AsyncMesh: Fully Asynchronous Optimization for Data and Pipeline Parallelism](https://arxiv.org/pdf/2601.22442).
+#### Async SPARTA
 
-#### Config Loading
+Each worker accumulates gradients from its own backward passes and runs its own optimizer step locally; there is no per-step gradient AllReduce. Same-stage replicas drift apart as a result. To re-synchronize, every 20 local steps the worker matches with same-stage peers over the DHT and AllReduces 5% of its parameters. Successive rounds cover non-overlapping slices, so the full parameter set has cycled through over a 20-round window.
 
-Workers use a three-tier YAML hierarchy, loaded bottom-up via deep recursive merge.
+!!! info "Paper"
+    [AsyncMesh: Fully Asynchronous Optimization for Data and Pipeline Parallelism](https://arxiv.org/pdf/2601.22442)
 
-```text
-worker_configs/default.yaml                     # root defaults (ports, compression, log rules)
-  +-- worker_configs/llama/default.yaml          # model defaults (model_name, optim, averager, lr)
-        +-- llama/debug_sparta_async_C.yaml      # variant overrides (num_stages, target_batch_size)
-```
+#### Connection Handlers
 
-#### Startup Flow
+gRPC listeners that receive trainer requests and put each batch into the right queue: forward or backward. Multiple listeners share a single port.
 
-The worker startup proceeds through initialization, expert construction, and optional state download from peers.
+#### DHTHandler
 
-1. Parse CLI args and merge the YAML config hierarchy
-2. Load model arguments from the registry (e.g., `debugmodel_C`)
-3. Connect to seed nodes via <span class="t-discovery">DHT</span>
-4. Generate expert UIDs and check for duplicates in the <span class="t-discovery">DHT</span>
-5. Instantiate the expert model, filter parameters into decay/no-decay groups
-6. Wrap the expert in `ModuleCollab` (forward/backward task pools + mixed precision)
-7. Move the expert to GPU and run `torch.compile` warmup (dummy forward/backward to trigger JIT compilation)
-8. Create the collaborative optimizer (`OptimizerAsyncSparta`)
-9. Load weights: seed peers skip this step and use random init; non-seed peers call `load_state_from_peers()` and block until state is downloaded
-10. Wait for the join window (delays joining until the swarm is not mid-AllReduce)
+A background thread that keeps re-announcing this worker in the DHT under its stage-prefixed UID (`head.0.0`, `body1.0.1`, `tail.0.0`). Trainers read the announcements to find workers; same-stage peers use them for matchmaking during `AllReduce`.
 
-#### Runtime Threads
+#### Runtime
 
-| Thread | Purpose |
-|---|---|
-| **Runtime** | Polls forward/backward TaskPools, processes batches, sends outputs back |
-| **ConnectionHandler** | Receives gRPC requests from trainers, deserializes tensors, submits to TaskPools. Multiple `ConnectionHandler` instances run concurrently on the same port, each its own thread. |
-| **DHTHandlerThread** | Periodically declares experts to the <span class="t-discovery">DHT</span> with current ghost phase (default 30 s update period) |
-| **CheckpointSaver** | Periodically saves model state to disk or S3 (only when checkpointing is configured) |
+The main loop. Dequeues batches from the forward and backward queues and runs them through `ModuleBackend`. On the backward path it rebuilds the autograd graph by re-running the forward (see [activation recomputation](memory-communication.md#activation-recomputation) for details), calls `torch.autograd.backward()`, and triggers the optimizer step at the appropriate point in the batch-size accumulator.
 
-#### Batch Processing
+---
 
-```text
-Trainer sends gRPC request
-  -> ConnectionHandler.rpc_forward() deserializes tensors
-    -> forward_pool.submit_task(*inputs), queued
-      -> TaskPool accumulates min_batch_size..max_batch_size tasks
-        -> Sends batch to Runtime via pipe
-          -> Runtime calls ModuleCollab.forward(*batch)
-            -> Expert forward pass on GPU
-          -> Output sent back through pipe
-        -> TaskPool dispatches to individual Futures
-      -> ConnectionHandler serializes result
-    -> gRPC response back to trainer
-```
+#### Batch processing
 
-The backward path is identical but calls `ModuleCollab.backward()`, which re-runs the forward pass (because pipeline-stage inputs are detached between workers — see [Memory & Communication](memory-communication.md) for why this is **not** gradient checkpointing), calls `torch.autograd.backward()`, and invokes `on_backward(batch_size)` to trigger the optimizer step.
+Once running, the Worker runs an event loop processing batches from trainers:
 
-#### DHT { .t-discovery }
+1. Trainer sends a forward request via gRPC → Connection Handler places it in the forward queue.
+2. Runtime dequeues the batch → calls `ModuleBackend.forward()` → returns the output.
+3. Trainer sends a backward request with gradient outputs → Connection Handler places it in the backward queue.
+4. Runtime dequeues the batch → calls `ModuleBackend.backward()` → triggers the optimizer step.
 
-Workers use Hivemind's Kademlia-based <span class="t-discovery">DHT</span> [unchanged from the original implementation](https://learning-at-home.readthedocs.io/en/latest/modules/dht.html) for peer discovery, expert registration, progress tracking, and matchmaking for SPARTA averaging rounds. Only seed nodes patch the <span class="t-discovery">DHT</span> protocol — workers run the stock library.
+#### See also
+
+- **How a new Worker joins a running swarm** (state download, queue, sync mode) → [Contributor Join Flow](startup-sequence.md).
+- **What happens at the optimizer step** (ProgressTracker, Matchmaking, SPARTA AllReduce) → [Communication Patterns](memory-communication.md#communication-patterns).
+- **Sync-mode entry / exit conditions and Worker-failure handling** → [Fault Tolerance](fault-tolerance.md).
 
 ---
 
 ### Trainers
 
-The trainer is a **HuggingFace Trainer** that holds **no model parameters**. It contains a dummy `nn.Parameter(randn(1,1))` so that the HuggingFace API does not raise errors, along with a `NoOpOptimizer` and `NoOpScheduler` that perform no work. The real model lives on workers — the trainer sends batches through the pipeline via remote calls.
+The trainer's role looks like an ordinary PyTorch training loop: forward through the model, compute a loss, call backward. The difference is that none of those calls run locally. Every `forward` and `backward` is dispatched over the network to a worker holding the relevant stage. The trainer's responsibilities are to track the full pipeline topology, select a healthy worker for each stage, and route activations forward and activation gradients back. Parameter gradients themselves never leave a worker, and the trainer never holds parameters of its own.
 
-#### Key Properties
+<figure class="agora-figure" markdown="0">
+<div class="trainer-fig">
+<svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Trainer pipeline diagram: Trainer orchestrating remote workers across head / body / tail stages">
+  <defs>
+    <marker id="tr-arr-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#d73a49"/></marker>
+    <marker id="tr-arr-warn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#bf8700"/></marker>
+  </defs>
 
-- Configured to run on **CPU only** via `--no_cuda`. All tensors received from workers are stored in CPU RAM. (CPU-only is a launch-time convention, not enforced server-side.)
-- Each trainer gets a different data shard via `--data_idx`, ensuring trainers process different portions of the dataset.
-- Multiple trainers are supported and run independently. Workers serve all incoming requests regardless of which trainer sent them.
-- Listens on a port allocated by the launch scripts (default convention: `49220 + 10 * trainer_idx`).
+  <!-- Trainer node at top centre -->
+  <rect x="280" y="20" width="200" height="60" rx="6" fill="#ffffff" stroke="#999" stroke-width="1.5"/>
+  <text x="380" y="44" text-anchor="middle" font-family="Inter,sans-serif" font-size="15" font-weight="700" fill="#111">Trainer</text>
+  <text x="380" y="62" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" fill="#555">CPU · holds no parameters</text>
 
-#### The Pipeline Model: TrainerLMNStage
+  <!-- Trainer → workers: stems -->
+  <line x1="380" y1="80" x2="380" y2="115" stroke="#999" stroke-width="1" stroke-dasharray="3 3"/>
+  <text x="392" y="100" font-family="Inter,sans-serif" font-size="11" fill="#444">libp2p gRPC · forward / backward</text>
 
-The trainer wraps remote expert calls into a pipeline via `TrainerLMNStage`, a `torch.nn.Module`:
+  <!-- Connector branching to four stages -->
+  <line x1="100" y1="115" x2="660" y2="115" stroke="#999" stroke-width="1" stroke-dasharray="3 3"/>
+  <line x1="100" y1="115" x2="100" y2="150" stroke="#999" stroke-width="1" stroke-dasharray="3 3"/>
+  <line x1="287" y1="115" x2="287" y2="150" stroke="#999" stroke-width="1" stroke-dasharray="3 3"/>
+  <line x1="473" y1="115" x2="473" y2="150" stroke="#999" stroke-width="1" stroke-dasharray="3 3"/>
+  <line x1="660" y1="115" x2="660" y2="150" stroke="#999" stroke-width="1" stroke-dasharray="3 3"/>
+
+  <!-- Stage boxes -->
+  <g font-family="Inter,sans-serif">
+    <rect x="40" y="150" width="120" height="120" rx="6" fill="#f0f7ff" stroke="#0969da" stroke-width="1.5"/>
+    <text x="100" y="174" text-anchor="middle" font-size="11" font-weight="600" letter-spacing="1" fill="#0969da">STAGE 0</text>
+    <text x="100" y="196" text-anchor="middle" font-size="14" font-weight="700" fill="#111">Head</text>
+    <text x="100" y="220" text-anchor="middle" font-size="11" fill="#444">embed · early layers</text>
+    <text x="100" y="246" text-anchor="middle" font-size="10" fill="#777">Pipe 0 / Pipe 1</text>
+
+    <rect x="227" y="150" width="120" height="120" rx="6" fill="#f9f9f9" stroke="#0969da" stroke-width="1.5"/>
+    <text x="287" y="174" text-anchor="middle" font-size="11" font-weight="600" letter-spacing="1" fill="#777">STAGE 1</text>
+    <text x="287" y="196" text-anchor="middle" font-size="14" font-weight="700" fill="#111">Body 1</text>
+    <text x="287" y="220" text-anchor="middle" font-size="11" fill="#444">transformer block</text>
+    <text x="287" y="246" text-anchor="middle" font-size="10" fill="#777">Pipe 0 / Pipe 1</text>
+
+    <rect x="413" y="150" width="120" height="120" rx="6" fill="#f9f9f9" stroke="#0969da" stroke-width="1.5"/>
+    <text x="473" y="174" text-anchor="middle" font-size="11" font-weight="600" letter-spacing="1" fill="#777">STAGE 2</text>
+    <text x="473" y="196" text-anchor="middle" font-size="14" font-weight="700" fill="#111">Body 2</text>
+    <text x="473" y="220" text-anchor="middle" font-size="11" fill="#444">transformer block</text>
+    <text x="473" y="246" text-anchor="middle" font-size="10" fill="#777">Pipe 0 / Pipe 1</text>
+
+    <rect x="600" y="150" width="120" height="120" rx="6" fill="#f0f7ff" stroke="#0969da" stroke-width="1.5"/>
+    <text x="660" y="174" text-anchor="middle" font-size="11" font-weight="600" letter-spacing="1" fill="#0969da">STAGE 3</text>
+    <text x="660" y="196" text-anchor="middle" font-size="14" font-weight="700" fill="#111">Tail</text>
+    <text x="660" y="220" text-anchor="middle" font-size="11" fill="#444">final layers · loss</text>
+    <text x="660" y="246" text-anchor="middle" font-size="10" fill="#777">Pipe 0 / Pipe 1</text>
+  </g>
+
+  <!-- Forward direction band (red, matching .fig-forward in figcaption) -->
+  <line x1="160" y1="290" x2="600" y2="290" stroke="#d73a49" stroke-width="2" marker-end="url(#tr-arr-blue)"/>
+  <text x="380" y="284" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" font-weight="600" fill="#d73a49">Forward: activations · Head → Body → Tail</text>
+
+  <!-- Backward direction band -->
+  <line x1="600" y1="310" x2="160" y2="310" stroke="#bf8700" stroke-width="2" marker-end="url(#tr-arr-warn)"/>
+  <text x="380" y="304" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" font-weight="600" fill="#bf8700">Backward: grad_input · Tail → Body → Head</text>
+</svg>
+</div>
+<figcaption>The Trainer (CPU, no parameters) orchestrates remote workers across pipeline stages over libp2p gRPC. <span class="fig-forward">Forward</span> activations flow Head → Body → Tail; <span class="fig-backward">backward</span> activation gradients flow Tail → Body → Head. Two pipes per stage give data-parallel redundancy.</figcaption>
+</figure>
+
+#### Training flow
+
+##### Startup
+
+1. Loads configuration and tokenizer config.
+2. Prepares the dataset from Hugging Face.
+3. Creates DHT connections using seed peers. Each model stage has its own dedicated DHT, enabling partitioning across stages.
+4. Using the DHT, the Trainer discovers workers in each stage; all stages must show at least one available Worker before training can start.
+
+##### Training loop
+
+For each batch, the trainer iterates through the pipeline in order:
 
 ```python
-head = BalancedRemoteExpert(dht=dhts[0], uid_prefix="head.", ...)
-body = [BalancedRemoteExpert(dht=dhts[i], uid_prefix=f"body{i}.", ...) for each body stage]
-tail = BalancedRemoteExpert(dht=dhts[-1], uid_prefix="tail.", ...)
+hidden = head.forward(input_ids[:, :-1])
+hidden = body1.forward(hidden)
+hidden = body2.forward(hidden)
+loss   = tail.forward(hidden, input_ids[:, 1:])   # shifted labels for LM
+loss.backward()                                   # triggers backward on all stages
 ```
 
-The forward pass sends input tokens through head, then each body stage in sequence, then tail with shifted labels for next-token prediction. Each `BalancedRemoteExpert` call is a **network RPC** to a worker via libp2p, with an internal `ExpertBalancer` selecting which specific worker to call.
+Worker selection within a stage uses a min-heap keyed by accumulated virtual runtime: the least-loaded worker is selected. When a worker finishes a request, its runtime is credited with the task's estimated duration and the worker re-enters the heap; new arrivals enter at the end. A transient network error triggers a retry against the same worker or a different one depending on the error class, and an unreachable worker is **short-banned** from the heap for 30s. A pipeline step only stalls if a stage empties entirely: every worker in that stage unreachable or short-banned at once.
 
-#### Load Balancing: ExpertBalancer
-
-`ExpertBalancer` keeps a min-heap priority queue of workers per stage, keyed by accumulated virtual runtime. Every request is routed to the least-loaded worker; after the worker completes the request, its runtime is incremented by the estimated task duration and it re-enters the heap. New workers join at the back of the queue.
-
-- **P2P dial failures** — the worker is short-banned for `update_period * 2` seconds (≈ 60 s with the default `update_period=30`).
-- **Expert verification failures** — the worker is banned for 3600 s.
-- **Refresh** — the trainer re-queries each stage's full expert list every 600 s (`refresh_experts_period`).
-
-#### Fault Tolerance: RobustTrainer
-
-Fault tolerance has two nested layers:
-
-1. **Per-RPC retries** inside `BalancedRemoteExpert` — transient errors trigger a retry against the same or a different worker. Workers that keep failing are short-banned (see [Load Balancing](#load-balancing-expertbalancer)).
-2. **Whole-step catch** in `RobustTrainer` — wraps every HuggingFace `training_step`. If the inner retry loop ultimately raises (worker down, timeout, etc.), `RobustTrainer` logs a warning, returns `torch.tensor(0.0)` as the loss, and continues to the next batch. A single failed batch never stops training.
-
-If every worker in a stage is unreachable at the same time, the inner retry loop blocks until one becomes available again — at which point training resumes for that pipeline step.
-
-#### <span class="t-discovery">DHT</span> Allocation
-
-Workers connect to a single <span class="t-discovery">DHT</span> instance (their stage's). Trainers connect to **all** <span class="t-discovery">DHT</span> instances — one per stage in `client_mode=True` for expert discovery, plus one dedicated trainer <span class="t-discovery">DHT</span> (not in client mode) for progress reporting and commands.
-
-Each stage's workers register themselves in the <span class="t-discovery">DHT</span> under a stage-prefixed UID — for example `head.0.0`, `body1.0.1`, `tail.0.0`. The trainer queries those prefixes to discover available workers and refreshes its full per-stage view every 600 s.
+Each pipeline stage gets its own <span class="t-discovery">DHT</span> connection on the trainer, so worker discovery for stage `head` is independent of discovery for stage `body3`. The full protocol for how workers and trainers announce and refresh each other is in [Communication Patterns → Periodic node announcement](memory-communication.md#periodic-node-announcement-peer-discovery).
