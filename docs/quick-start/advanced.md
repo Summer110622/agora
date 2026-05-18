@@ -11,14 +11,17 @@ icon: material/cog
 Run one CLI instance per GPU:
 
 ```bash
-python3 agora.py --gpu_id 0
-python3 agora.py --gpu_id 1
+python3 agora_cli.py --gpu_id 0
+python3 agora_cli.py --gpu_id 1
 ```
 
 Each GPU automatically uses its own port (49200, 49201, ...). Make sure every port is open for inbound TCP.
 
-- **Native** — run each command in a separate terminal (or tmux window)
-- **Docker** — each instance runs in its own container automatically
+- **Native.** Run each command in a separate terminal (or tmux window).
+- **Docker.** Each instance gets its own container automatically.
+
+!!! info "Maximum 2 peers per account"
+    We allow up to **2 active peers per account**. We may relax the cap during the live run.
 
 ---
 
@@ -36,10 +39,11 @@ The CLI prompts interactively, but every value can be passed as a flag:
 | `--use_docker` | Run inside Docker |
 | `--log_file <PATH>` | Log file path (default: `logs/server_gpu<ID>.log`) |
 | `--identity_path <PATH>` | Identity key path (default: `private_gpu<ID>.key`) |
-| `--skip_input` | Non-interactive — all values must come from flags or saved config |
+| `--batch_size_override <N>` | **Advanced.** Force a lower max batch size than the system would auto-pick. Useful when CUDA OOM occurs at the recommended size (common on edge-case GPUs or when other processes share the device). The effective max batch is `min(batch_size_override, recommended_batch_size)`, so the cap can only be lowered, not raised. Start at the recommended size and lower it until OOM stops. |
+| `--skip_input` | Non-interactive: all values must come from flags or saved config |
 | `--reconfigure` | Re-prompt every setting from scratch |
 
-The `--log_file` and `--identity_path` defaults are almost always what you want — only override if you have a specific reason.
+The `--log_file` and `--identity_path` defaults are appropriate for most setups; override only if there is a specific reason.
 
 ---
 
@@ -101,23 +105,6 @@ PUBLIC_IP=$(curl -s https://api.ipify.org)
 
 Default port convention: `49200 + gpu_id`. Each GPU needs its own port.
 
-=== "Native"
-
-    ```bash
-    CUDA_VISIBLE_DEVICES=<gpu_id> python3.11 agora/src/agora/run_server.py \
-      --gpu_id <gpu_id> \
-      --config "$RUN_CONFIG" \
-      --token <hf_token> \
-      --auth_server "$AUTH_SERVER" \
-      --prom_gateway "$PROM_GATEWAY" \
-      --host_maddrs /ip4/0.0.0.0/tcp/<port> \
-      --announce_maddrs /ip4/$PUBLIC_IP/tcp/<port> \
-      --initial_peers $SEEDS \
-      --email <email> \
-      --log_file logs/server_gpu<gpu_id>.log \
-      --identity_path private_gpu<gpu_id>.key
-    ```
-
 === "Docker"
 
     ```bash
@@ -139,6 +126,23 @@ Default port convention: `49200 + gpu_id`. Each GPU needs its own port.
         --identity_path private_gpu<gpu_id>.key"
     ```
 
+=== "Native (no Docker)"
+
+    ```bash
+    CUDA_VISIBLE_DEVICES=<gpu_id> python3.11 agora/src/agora/run_server.py \
+      --gpu_id <gpu_id> \
+      --config "$RUN_CONFIG" \
+      --token <hf_token> \
+      --auth_server "$AUTH_SERVER" \
+      --prom_gateway "$PROM_GATEWAY" \
+      --host_maddrs /ip4/0.0.0.0/tcp/<port> \
+      --announce_maddrs /ip4/$PUBLIC_IP/tcp/<port> \
+      --initial_peers $SEEDS \
+      --email <email> \
+      --log_file logs/server_gpu<gpu_id>.log \
+      --identity_path private_gpu<gpu_id>.key
+    ```
+
 ---
 
 ## Caveats
@@ -147,10 +151,10 @@ Default port convention: `49200 + gpu_id`. Each GPU needs its own port.
 
 On first run, Agora generates a `private.key` file (or `private_gpu<ID>.key` for multi-GPU setups). This is your node's cryptographic identity.
 
-- **Required** for secure communication within the swarm
-- **Keep it private** — never share or commit it
-- **Tied to your HuggingFace account** — if you try to rejoin with the same `private.key` but a different HF account, authorization fails with `This peer_id is already used by another user`
-- **Losing it** means you'll join as a new identity — previous swarm contributions remain on the dashboard, but your node_id changes
+- **Required** for secure communication within the swarm.
+- **Keep it private.** Never share or commit it.
+- **Tied to your HuggingFace account.** Rejoining with the same `private.key` under a different HF account fails with `This peer_id is already used by another user`.
+- **Losing it** means you join as a new identity. Previous swarm contributions stay on the dashboard, but your `node_id` changes.
 
 ### Docker file ownership
 
