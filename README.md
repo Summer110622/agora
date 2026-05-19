@@ -14,7 +14,7 @@
     </a>
 </div>
 <div align="center">
-    <a href="https://dashboard.pluralis.ai/"><img alt="Dashboard"
+    <a href="https://agora.pluralis.ai/"><img alt="Dashboard"
     src="https://img.shields.io/badge/Dashboard-Online-62BB47"/></a>
     <a href="https://pluralis.ai/"><img alt="Website"
     src="https://img.shields.io/badge/PluralisResearch-Website-6F02B5"/></a>
@@ -37,7 +37,7 @@ Full documentation: [pluralis.ai/docs](https://pluralis.ai/docs/).
 Each participant's progress is logged - check their contribution in the dashboard.
 
 <div align="center">
-  <a href="https://dashboard.pluralis.ai/">
+  <a href="https://agora.pluralis.ai/">
     <img src="images/dashboard-button.svg" alt="Live Dashboard"/>
   </a>
 </div>
