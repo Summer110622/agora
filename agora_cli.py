@@ -324,7 +324,7 @@ def install_from_source(packages: list[str]):
     for pkg in packages:
         info(f"Installing {pkg}... (this may take a few minutes)")
         run_cmd(
-            [sys.executable, "-m", "pip", "install", "--constraint", "constraints.txt", "--build-constraint", constraints, "-e", f"./{pkg}"],
+            [sys.executable, "-m", "pip", "install", "--constraint", constraints, "--build-constraint", constraints, "-e", f"./{pkg}"],
             f"pip install {pkg} failed. Re-run with 'pip install --constraint constraints.txt --build-constraint constraints.txt -e ./{pkg}' to see full output.",
             capture_output=True,
         )
