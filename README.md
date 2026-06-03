@@ -167,8 +167,8 @@ pip install --upgrade "pip>=25.3"
 pip install torch==2.7.0 --index-url https://download.pytorch.org/whl/cu128
 
 # Install the two required packages from source
-pip install --build-constraint constraints.txt -e ./agora_server
-pip install --build-constraint constraints.txt -e ./agora
+pip install --constraint constraints.txt --build-constraint constraints.txt -e ./agora_server
+pip install --constraint constraints.txt --build-constraint constraints.txt -e ./agora
 ```
 
 **Step 2 — Read runtime parameters**

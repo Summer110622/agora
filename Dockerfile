@@ -42,6 +42,6 @@ RUN cd agora_server && uv pip install --system -e .
 
 # Install agora
 COPY agora/ agora/
-RUN cd agora && uv pip install --system --build-constraint ../constraints.txt -e .
+RUN cd agora && uv pip install --system --constraint ../constraints.txt --build-constraint ../constraints.txt -e .
 
 CMD ["bash"]
