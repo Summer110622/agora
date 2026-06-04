@@ -1,1 +1,2 @@
 setuptools<81.0
+grpcio-tools==1.80.0

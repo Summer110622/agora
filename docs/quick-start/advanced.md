@@ -73,8 +73,8 @@ The `--log_file` and `--identity_path` defaults are appropriate for most setups;
     pip install torch==2.7.0 --index-url https://download.pytorch.org/whl/cu128
 
     # Install the two required packages from source
-    pip install --build-constraint constraints.txt -e ./agora_server
-    pip install --build-constraint constraints.txt -e ./agora
+    pip install --constraint constraints.txt --build-constraint constraints.txt -e ./agora_server
+    pip install --constraint constraints.txt --build-constraint constraints.txt -e ./agora
     ```
 
 ### 2. Read runtime parameters

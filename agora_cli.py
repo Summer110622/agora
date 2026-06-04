@@ -324,8 +324,8 @@ def install_from_source(packages: list[str]):
     for pkg in packages:
         info(f"Installing {pkg}... (this may take a few minutes)")
         run_cmd(
-            [sys.executable, "-m", "pip", "install", "--build-constraint", constraints, "-e", f"./{pkg}"],
-            f"pip install {pkg} failed. Re-run with 'pip install --build-constraint constraints.txt -e ./{pkg}' to see full output.",
+            [sys.executable, "-m", "pip", "install", "--constraint", constraints, "--build-constraint", constraints, "-e", f"./{pkg}"],
+            f"pip install {pkg} failed. Re-run with 'pip install --constraint constraints.txt --build-constraint constraints.txt -e ./{pkg}' to see full output.",
             capture_output=True,
         )
     info("Installation complete.")
@@ -415,7 +415,7 @@ def ensure_installed(use_docker: bool, skip_input: bool = False):
         missing = detect_missing_packages()
         if missing:
             missing_str = ", ".join(missing)
-            install_str = " && ".join(f"pip install --build-constraint constraints.txt -e ./{pkg}" for pkg in missing)
+            install_str = " && ".join(f"pip install --constraint constraints.txt --build-constraint constraints.txt -e ./{pkg}" for pkg in missing)
             if skip_input:
                 error(f"{missing_str} not installed. Run: {install_str}")
                 sys.exit(1)

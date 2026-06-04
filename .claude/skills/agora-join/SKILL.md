@@ -108,11 +108,11 @@ Claude Code: run with `Bash` and `run_in_background: true`. Other agents: `nohup
 **Install `agora_server` and `agora` first.** The CLI does not install them in native mode (Docker mode bakes them into the image; native does not). From the repo root:
 
 ```bash
-pip install --build-constraint constraints.txt -e ./agora_server
-pip install --build-constraint constraints.txt -e ./agora
+pip install --constraint constraints.txt --build-constraint constraints.txt -e ./agora_server
+pip install --constraint constraints.txt --build-constraint constraints.txt -e ./agora
 ```
 
-Both installs are required and must use `--build-constraint constraints.txt` — without it, transitive build deps drift and the server fails to start. If either install fails, surface the pip error and stop — do not proceed to launch.
+Both installs are required and must use `--constraint constraints.txt` and `--build-constraint constraints.txt` — without it, transitive build deps drift and the server fails to start. If either install fails, surface the pip error and stop — do not proceed to launch.
 
 `_start_native` (`agora_cli.py:806-902`) blocks waiting on the server subprocess and streams its stdout to whatever terminal it inherits. Backgrounding the CLI directly from the agent's shell is unsafe: when the agent's shell or the user's SSH session terminates, SIGHUP propagates and the server dies. Solution: run the CLI inside a **detached tmux session**.
 
