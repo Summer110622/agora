@@ -227,6 +227,8 @@ class Server(threading.Thread):
         max_batch_size: int,
         stats_report_interval: int,
         coalesce_batches: bool = True,
+        pool_size: int = 256,
+        queue_stale_timeout: float | None = 1200.0,
         min_lr_ratio: float = 0.1,
         update_period: float = 30,
         num_experts: int | None = None,
@@ -468,6 +470,8 @@ class Server(threading.Thread):
                     delay_range_forward_backward=delay_range_forward_backward,
                     use_mixed_precision=use_mixed_precision,
                     use_torch_compile=use_torch_compile,
+                    pool_size=pool_size,
+                    queue_stale_timeout=queue_stale_timeout,
                 )
 
                 backend.module.to(device)

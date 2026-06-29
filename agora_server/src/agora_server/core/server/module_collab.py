@@ -20,6 +20,7 @@ from typing import Any, Dict
 
 import torch
 
+from agora_server.core.server.bounded_task_pool import BoundedTaskPool
 from hivemind.moe.server import ModuleBackend
 from hivemind.utils.logging import get_logger
 from hivemind.utils.nested import nested_compare, nested_flatten, nested_pack
@@ -44,10 +45,27 @@ class ModuleCollab(ModuleBackend):
         delay_range_forward_backward: tuple[float, float] = (0.0, 0.0),
         use_mixed_precision: bool = False,
         use_torch_compile: bool = False,
+        pool_size: int = 256,
+        queue_stale_timeout: float | None = 1200.0,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
+
+        # Replace the unbounded base task pools with bounded, self-pruning ones to cap
+        # CPU-RAM under trainer pressure (reject-on-full + drop stale requests).
+        _fwd, _bwd = self.forward_pool, self.backward_pool
+        self.forward_pool = BoundedTaskPool(
+            self.forward, name=_fwd.name, min_batch_size=_fwd.min_batch_size,
+            max_batch_size=_fwd.max_batch_size, timeout=_fwd.timeout,
+            prefetch_batches=_fwd.prefetch_batches, pool_size=pool_size, stale_timeout=queue_stale_timeout,
+        )
+        self.backward_pool = BoundedTaskPool(
+            self.backward, name=_bwd.name, min_batch_size=_bwd.min_batch_size,
+            max_batch_size=_bwd.max_batch_size, timeout=_bwd.timeout,
+            prefetch_batches=_bwd.prefetch_batches, pool_size=pool_size, stale_timeout=queue_stale_timeout,
+        )
+        logger.info(f"Task pools bounded: pool_size={pool_size}, stale_timeout={queue_stale_timeout}s")
 
         self.optimizer_lock = optimizer_lock
         self.delay_range_forward_backward = delay_range_forward_backward

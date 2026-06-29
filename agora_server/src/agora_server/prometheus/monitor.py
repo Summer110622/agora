@@ -203,6 +203,11 @@ class WorkerRegex:
     regex_node_download_mbps: str = r"Download Speed:\s*([\d.]+)\s*Mbps"
     node_upload_mbps: str = "upload_speed"
     regex_node_upload_mbps: str = r"Upload Speed:\s*([\d.]+)\s*Mbps"
+    # Task-queue depth (worker-side queue safety bound)
+    fwd_queue_size: str = "forward_queue_size"
+    regex_fwd_queue_size: str = r"Forward queue size is (\d+)"
+    bwd_queue_size: str = "backward_queue_size"
+    regex_bwd_queue_size: str = r"Backward queue size is (\d+)"
     # Communication
     peer_vis: str = "peer_vis"
     regex_peer_vis: str = r"see\s+(\d+)\s+of\s+([a-zA-Z0-9]+)\."
@@ -468,6 +473,17 @@ class WorkerPromMonitor(BasePromMonitor):
         if match:
             val = float(match.group(1))
             self.metrics.record_operation(f"{self.worker_regex.post_step_grad}", val)
+            return
+
+        # Task queues
+        match = re.search(self.worker_regex.regex_fwd_queue_size, log_entry)
+        if match:
+            self.metrics.record_operation(f"{self.worker_regex.fwd_queue_size}", float(match.group(1)))
+            return
+
+        match = re.search(self.worker_regex.regex_bwd_queue_size, log_entry)
+        if match:
+            self.metrics.record_operation(f"{self.worker_regex.bwd_queue_size}", float(match.group(1)))
             return
 
         # GPU

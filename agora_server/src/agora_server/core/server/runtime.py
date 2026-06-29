@@ -87,7 +87,7 @@ class Runtime(threading.Thread):
 
         self.stats_report_interval = stats_report_interval
         if self.stats_report_interval is not None:
-            self.stats_reporter = StatsReporter(self.stats_report_interval)
+            self.stats_reporter = StatsReporter(self.stats_report_interval, pools=self.pools)
 
     def run(self):
         for pool in self.pools:
@@ -250,14 +250,25 @@ class Runtime(threading.Thread):
 
 
 class StatsReporter(threading.Thread):
-    def __init__(self, report_interval: int):
+    def __init__(self, report_interval: int, pools=()):
         super().__init__()
         self.report_interval = report_interval
+        self.pools = pools
         self.stop = threading.Event()
         self.stats_queue = SimpleQueue()
 
     def run(self):
         while not self.stop.wait(self.report_interval):
+            # Report per-pool input-queue depth (parsed into a Prometheus gauge via WorkerRegex).
+            for pool in self.pools:
+                try:
+                    qsize = pool.tasks.qsize()
+                except (NotImplementedError, OSError):
+                    continue
+                if pool.name.endswith("_forward"):
+                    logger.info(f"Forward queue size is {qsize}")
+                elif pool.name.endswith("_backward"):
+                    logger.info(f"Backward queue size is {qsize}")
             pool_batch_stats = defaultdict(list)
             while not self.stats_queue.empty():
                 pool_uid, batch_stats = self.stats_queue.get()
