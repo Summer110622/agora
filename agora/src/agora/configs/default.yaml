@@ -111,6 +111,8 @@ use_mixed_precision: false
 use_torch_compile: false
 compile_warmup_batches: 1
 min_lr_ratio: 0.01
+pool_size: 256
+queue_stale_timeout: 1200
 
 # Log Monitor Rules
 log_monitor_rules:
