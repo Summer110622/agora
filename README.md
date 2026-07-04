@@ -3,7 +3,6 @@
 <!-- markdownlint-disable no-duplicate-header -->
 
 <!-- docs-exclude-start -->
-<!-- TODO(design): replace node0-logo-{white,black}.png with the Agora banner. -->
 <div align="center">
     <a href="https://pluralis.ai/" target="_blank">
     <picture>
@@ -20,6 +19,10 @@
     src="https://img.shields.io/badge/PluralisResearch-Website-6F02B5"/></a>
     <a href="https://pluralis.ai/docs/"><img alt="Docs"
     src="https://img.shields.io/badge/Docs-Website-C76e00"/></a>    
+</div>
+
+<div align="center">
+    <img src="images/run-concluded-banner.svg" alt="The Pluralis-8B run has concluded. We're pleased to announce that the Pluralis-8B run has successfully completed after training 500B tokens over 7 weeks. We thank all the contributors!" width="760" style="max-width: 100%"/>
 </div>
 <!-- docs-exclude-end -->
 
@@ -38,7 +41,7 @@ Each participant's progress is logged - check their contribution in the dashboar
 
 <div align="center">
   <a href="https://agora.pluralis.ai/">
-    <img src="images/dashboard-button.svg" alt="Live Dashboard"/>
+    <img src="images/dashboard-button.svg" alt="Dashboard"/>
   </a>
 </div>
       
