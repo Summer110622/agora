@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="186" viewBox="0 0 760 186" role="img" aria-labelledby="concluded-title concluded-desc">
+  <title id="concluded-title">The Pluralis-8B run has concluded</title>
+  <desc id="concluded-desc">We're pleased to announce that the Pluralis-8B run has successfully completed after training 500B tokens over 7 weeks. We thank all the contributors!</desc>
+
+  <defs>
+    <linearGradient id="concluded-accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#4a9eff"/>
+      <stop offset="1" stop-color="#fb923c"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Note panel -->
+  <rect x="0.5" y="0.5" width="759" height="185" rx="6" ry="6" fill="#12121a" stroke="#2a2a3a"/>
+
+  <!-- Mono eyebrow -->
+  <text x="380" y="38"
+        text-anchor="middle"
+        font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace"
+        font-size="10" font-weight="600" letter-spacing="2" fill="#8888a0">ANNOUNCEMENT</text>
+
+  <!-- Title -->
+  <text x="380" y="72"
+        text-anchor="middle"
+        font-family="'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+        font-size="24" font-weight="600" fill="#e0e0e8">The Pluralis-8B run has concluded</text>
+
+  <!-- Accent divider -->
+  <rect x="350" y="86" width="60" height="2" rx="1" fill="url(#concluded-accent)"/>
+
+  <!-- Body -->
+  <text x="380" y="114"
+        text-anchor="middle"
+        font-family="'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+        font-size="14" fill="#8888a0">We're pleased to announce that the Pluralis-8B run has successfully completed</text>
+  <text x="380" y="134"
+        text-anchor="middle"
+        font-family="'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+        font-size="14" fill="#8888a0">after training <tspan font-weight="600" fill="#e0e0e8">500B tokens</tspan> over <tspan font-weight="600" fill="#e0e0e8">7 weeks</tspan>.</text>
+
+  <!-- Thank you -->
+  <text x="380" y="162"
+        text-anchor="middle"
+        font-family="'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+        font-size="16" font-weight="600" fill="#e0e0e8">We thank all the contributors!</text>
+</svg>
