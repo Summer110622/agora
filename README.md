@@ -2,13 +2,6 @@
 <!-- markdownlint-disable html -->
 <!-- markdownlint-disable no-duplicate-header -->
 
-> **Community development in this fork:** see [Sakura community training](sakura/README.md)
-> for the independent launcher, portable Qwen3.5 LoRA pipeline, tests and current validation limits.
-> Run `python sakura_cli.py --help` for this path. The upstream event documentation follows below.
->
-> **Colab + PC inference:** [setup and notebook](sakura/INFERENCE.md),
-> `python sakura_inference.py --help` (cached GPU generation and optional cached MoE stages).
-
 <!-- docs-exclude-start -->
 <div align="center">
     <a href="https://pluralis.ai/" target="_blank">

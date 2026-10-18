@@ -14,11 +14,3 @@ __pycache__/
 # retype
 .retype
 retype.manifest
-
-# Community runtime environments, identities and generated training state
-.venv/
-.pytest_cache/
-.ruff_cache/
-sakura/runs/
-*.private.json
-*.private.key

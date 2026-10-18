@@ -1,3 +1,0 @@
-# CUDA 12.8 profile. Choose a compatible host driver; certify on the actual GPU.
---index-url https://download.pytorch.org/whl/cu128
-torch==2.10.0
