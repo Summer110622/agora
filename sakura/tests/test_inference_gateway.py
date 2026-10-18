@@ -413,6 +413,31 @@ class CachedDenseGenerationTests(unittest.TestCase):
         self.assertEqual(metrics["device"], "cpu")
         self.assertEqual(metrics["dtype"], "torch.float32")
 
+    def test_real_hf_chat_tokenizer_returns_ids_for_dense_generation(self):
+        from collections.abc import Mapping
+        from tokenizers import Tokenizer
+        from tokenizers.models import WordLevel
+        from tokenizers.pre_tokenizers import Whitespace
+        from transformers import PreTrainedTokenizerFast
+
+        vocabulary = {"[PAD]": 0, "[UNK]": 1, "hello": 2, "assistant": 3}
+        vocabulary.update({f"token{index}": index for index in range(4, 64)})
+        backend = Tokenizer(WordLevel(vocabulary, unk_token="[UNK]"))
+        backend.pre_tokenizer = Whitespace()
+        tokenizer = PreTrainedTokenizerFast(tokenizer_object=backend, unk_token="[UNK]", pad_token="[PAD]")
+        tokenizer.chat_template = "{{ messages[0]['content'] }}{% if add_generation_prompt %} assistant{% endif %}"
+        # Transformers 5.9 returns BatchEncoding by default. The generation
+        # boundary needs token IDs, rather than iteration over its string keys.
+        default_encoded = tokenizer.apply_chat_template([{"role": "user", "content": "hello"}],
+                                                        tokenize=True, add_generation_prompt=True)
+        self.assertIsInstance(default_encoded, Mapping)
+        generator = HFGenerator(self.model, tokenizer, max_context=32)
+        self.assertEqual(generator._encode("hello").tolist(), [[2, 3]])
+        result = generator.generate("hello", max_new_tokens=2)
+        self.assertEqual(result["metrics"]["prompt_tokens"], 2)
+        self.assertEqual(len(result["token_ids"]), 2)
+        self.assertTrue(result["metrics"]["use_cache"])
+
     def test_context_limit_is_exact_and_never_truncates_or_calls_model_on_overflow(self):
         generator = HFGenerator(self.model, self.tokenizer, max_context=8)
         self.assertEqual(len(generator.generate("abc", max_new_tokens=4)["token_ids"]), 4)

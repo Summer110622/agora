@@ -93,3 +93,40 @@ def test_split_serve_supports_native_tls_and_cache_budget():
                                "--stage", "1", "--tls-cert", "cert.pem", "--tls-key", "key.pem",
                                "--max-cache-mib", "256", "--dtype", "float16"])
     assert (args.stage, args.tls_cert, args.max_cache_mib, args.dtype) == (1, "cert.pem", 256, "float16")
+
+
+def test_split_chat_handles_real_hf_chat_tokenizer_batch_encoding_default():
+    import torch
+    from collections.abc import Mapping
+    from tokenizers import Tokenizer
+    from tokenizers.models import WordLevel
+    from tokenizers.pre_tokenizers import Whitespace
+    from transformers import PreTrainedTokenizerFast
+
+    backend = Tokenizer(WordLevel({"[PAD]": 0, "[UNK]": 1, "hello": 2, "assistant": 3,
+                                  "answer": 4}, unk_token="[UNK]"))
+    backend.pre_tokenizer = Whitespace()
+    tokenizer = PreTrainedTokenizerFast(tokenizer_object=backend, unk_token="[UNK]", pad_token="[PAD]")
+    tokenizer.chat_template = "{{ messages[0]['content'] }}{% if add_generation_prompt %} assistant{% endif %}"
+    assert isinstance(tokenizer.apply_chat_template([{"role": "user", "content": "hello"}]), Mapping)
+    manifest = {"num_stages": 2, "tokenizer": {}, "members": {}}
+    with tempfile.TemporaryDirectory() as temporary:
+        endpoints = Path(temporary) / "endpoints.json"
+        endpoints.write_text(json.dumps([
+            {"stage_index": 0, "url": "https://pc.example/rpc", "member_id": "pc"},
+            {"stage_index": 1, "url": "https://gpu.example/rpc", "member_id": "colab"},
+        ]), encoding="utf-8")
+        output = io.StringIO()
+        with mock.patch("sakura.manifest.load_manifest", return_value=manifest), \
+                mock.patch("sakura.manifest.run_hash", return_value="a" * 64), \
+                mock.patch.object(Identity, "load"), \
+                mock.patch("sakura.tokenization.load_tokenizer", return_value=tokenizer), \
+                mock.patch("sakura.transport.RpcClient"), \
+                mock.patch("sakura.inference.CachedPipeline") as pipeline:
+            pipeline.return_value.generate.return_value = {"tokens": torch.tensor([[4]]), "metrics": {"stage_count": 2}}
+            with contextlib.redirect_stdout(output):
+                main(["split-chat", "--manifest", "unused-run.json", "--identity", "unused-private.json",
+                      "--endpoints", str(endpoints), "--prompt", "hello", "--max-new-tokens", "2"])
+            assert pipeline.return_value.generate.call_args.args[0].tolist() == [[2, 3]]
+            assert pipeline.return_value.generate.call_args.args[1] == 2
+        assert json.loads(output.getvalue()) == {"text": "answer", "metrics": {"stage_count": 2}}

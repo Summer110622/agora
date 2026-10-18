@@ -186,7 +186,7 @@ def _infer(args):
     tokenizer = load_tokenizer(manifest["tokenizer"], base_path=args.base_path)
     trainer = _inference_trainer(args, manifest)
     tokens = tokenizer.apply_chat_template([{"role": "user", "content": args.prompt}],
-                                            tokenize=True, add_generation_prompt=True)
+                                            tokenize=True, add_generation_prompt=True, return_dict=False)
     generated = []
     config = manifest["model"]["config"].get("text_config", manifest["model"]["config"])
     for _ in range(args.max_new_tokens):

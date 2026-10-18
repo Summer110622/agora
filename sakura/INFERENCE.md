@@ -14,9 +14,16 @@ Colab の managed runtime では、compute unit 残高のない無料利用で�
 
 ## まずノートブックだけで動かす
 
-1. 上の Colab リンクを開き、GPU runtime を選びます。
-2. `MODE="local"` のまま、セルを順に実行します。
-3. 生成セルだけを繰り返すと、読み込んだモデルを再利用できます。
+**Colab の runtime version は `2026.04` を選択してください。** 現在の既定 runtime は Python 3.13 ですが、このリポジトリは Python 3.11 / 3.12 が対象です。Colab 公式の `2026.04` は Python 3.12.13 / PyTorch 2.10.0 です。[公式の runtime 一覧と選択方法](https://research.google.com/colaboratory/runtime-version-faq.html)、[Python 3.13 への移行告知](https://github.com/googlecolab/colabtools/issues/6081)
+
+1. 上の Colab リンクを開き、**ランタイム → ランタイムのタイプを変更**を開きます。
+2. **Runtime Version（ランタイムのバージョン）を `2026.04`、ハードウェア アクセラレータを GPU** にして保存し、接続し直します。
+3. 新しいセッションでも runtime version を確認し、`MODE="local"` のまま先頭からセルを実行します。
+4. 生成セルだけを繰り返すと、読み込んだモデルを再利用できます。
+
+旧版をすでに実行した場合は、**ランタイム → 切断して削除**で新しいセッションにし、上の Colab リンクからノートブックを開き直してください。その後に `2026.04` を選び直します。同じセッションのまま再実行すると、`/content/agora` に残った古いコードを再利用する場合があります。
+
+すでに「Python 3.11 / 3.12 が対象です」と表示された場合も、この runtime 選択で対処します。
 
 初期モデルは [`Qwen/Qwen3.5-0.8B`](https://huggingface.co/Qwen/Qwen3.5-0.8B/tree/2fc06364715b967f1860aea9cf38778875588b17)、revision は `2fc06364715b967f1860aea9cf38778875588b17` です。公式モデルの config は `qwen3_5` / `Qwen3_5ForConditionalGeneration` です。35B MoE 用の loader に小型 dense モデルを渡す構成にはしていません。[公式 config](https://huggingface.co/Qwen/Qwen3.5-0.8B/blob/2fc06364715b967f1860aea9cf38778875588b17/config.json)
 
@@ -176,6 +183,7 @@ tiny の重みはランダム初期化なので、ここでは接続・cache・�
 
 | 症状 | 確認すること |
 |---|---|
+| Python 3.11 / 3.12 が対象というエラー | Colab の Runtime Version を `2026.04` に変更し、接続し直して先頭から実行する |
 | Colab で CUDA が見つからない | runtime が GPU か、GPU が割り当てられているか。CPU 利用は明示的に選択する |
 | worker が PC に接続できない | Colab から PC の HTTPS URL に到達するか。`localhost` / private IP だけでは別ホストから届かない |
 | TLS エラー | 正しい証明書・ホスト名と、利用者の HTTPS 終端の設定。証明書検証を無効にしない |

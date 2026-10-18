@@ -71,7 +71,7 @@ class HFGenerator:
     def _encode(self, prompt):
         if self.chat_template and getattr(self.tokenizer, "chat_template", None):
             ids = self.tokenizer.apply_chat_template([{"role": "user", "content": prompt}],
-                                                     tokenize=True, add_generation_prompt=True)
+                                                     tokenize=True, add_generation_prompt=True, return_dict=False)
         else:
             ids = self.tokenizer.encode(prompt, add_special_tokens=True)
         return torch.tensor([ids], dtype=torch.long, device=self.device)

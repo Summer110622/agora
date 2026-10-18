@@ -168,7 +168,7 @@ def _split_chat(args):
                         lambda request, row=row: client.call(row["url"], request, expected_member=row["member_id"])))
     if not args.raw_prompt and getattr(tokenizer, "chat_template", None):
         tokens = tokenizer.apply_chat_template([{"role": "user", "content": args.prompt}],
-                                               tokenize=True, add_generation_prompt=True)
+                                               tokenize=True, add_generation_prompt=True, return_dict=False)
     else:
         tokens = tokenizer.encode(args.prompt, add_special_tokens=False)
     result = CachedPipeline(endpoints, max_context=args.max_context, expected_run_hash=run_hash(manifest)).generate(
