@@ -29,6 +29,27 @@ Colab の managed runtime では、compute unit 残高のない無料利用で�
 
 ノートブックは Colab が提供する PyTorch を維持し、推論用の Transformers などを固定します。学習用の固定 PyTorch 環境とは別です。実際の PyTorch/CUDA/GPU 名を表示し、CUDA を選んだのに GPU が使えない場合は明示的に停止します。実装のローカル試験は CPU / PyTorch 2.10 が対象で、Colab 提供の GPU / PyTorch の組合せは実機で確認が必要です。モデルの初回ダウンロードが必要です。
 
+### `No module named 'sakura'` と表示された場合
+
+子プロセスで行う editable install は、すでに起動しているノートブックの読み込み先へ即時反映されません。更新版はセットアップとモデル読み込みの両方で、取得したソースの場所を現在のカーネルへ登録し、読み込んだパッケージの場所も確認します。
+
+旧版で止まったセッションは、次を新しいセルで実行してから、モデル読み込みセルを再実行できます。
+
+```python
+from pathlib import Path
+import sys, importlib
+
+src = Path(globals().get("REPO_DIRECTORY", "/content/agora")) / "sakura" / "src"
+if not (src / "sakura" / "__init__.py").is_file():
+    raise RuntimeError("先にパッケージのセットアップセルを完了してください。")
+sys.path.insert(0, str(src.resolve()))
+importlib.invalidate_caches()
+import sakura
+print(sakura.__file__)
+```
+
+標準設定では `/content/agora/sakura/src/sakura/__init__.py` が表示されます。ソースが見つからない場合は、先にセットアップセルの完了を確認してください。
+
 ## PC から Colab GPU に依頼する
 
 通信は次の向きです。
