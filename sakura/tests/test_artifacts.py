@@ -13,7 +13,9 @@ from sakura.artifacts import (
 class ArtifactTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
-        self.root = Path(self.temporary.name)
+        # macOS exposes its temporary directory through /var -> /private/var.
+        # Use the canonical fixture path; artifact symlink rejection stays strict.
+        self.root = Path(self.temporary.name).resolve()
         (self.root / "config.json").write_text('{"model_type":"qwen3_5_moe"}', encoding="utf-8")
         (self.root / "tokenizer.json").write_text('{"vocab":{"a":1}}', encoding="utf-8")
         (self.root / "tokenizer_config.json").write_text('{"pad_token":"<pad>"}', encoding="utf-8")
