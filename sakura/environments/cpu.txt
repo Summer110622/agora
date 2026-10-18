@@ -1,0 +1,3 @@
+# Install this backend profile first, then pip install -e './sakura[test]'.
+--index-url https://download.pytorch.org/whl/cpu
+torch==2.10.0
